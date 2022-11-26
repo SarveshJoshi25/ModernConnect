@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 import uuid
 from .exceptions import InvalidUsernameLength, InvalidUsernameInvalidLetters, InvalidUsernameUnderscore, \
     InvalidUsernameAlreadyExists, InvalidGender, InvalidAccountType, InvalidEmailHost, InvalidFullName, \
-    InvalidEmailAlreadyExists, InvalidLengthPassword
+    InvalidEmailAlreadyExists, InvalidLengthPassword, InvalidUserContactLengthNot10, InvalidUserContactNotDigit
 import string
 import bcrypt
 from utils import client, db
@@ -24,11 +24,23 @@ def validate_user_password(password: str):
     return True
 
 
+def validate_user_contact_number(contact_number: str):
+    if not contact_number.isdigit():
+        raise InvalidUserContactNotDigit
+    if not len(contact_number) == 10:
+        raise InvalidUserContactLengthNot10
+
+
+def validate_user_full_name(user_full_name: str):
+    for y in [x.isalpha() is True for x in user_full_name.split(' ')]:
+        if y is False:
+            raise InvalidFullName
+
+
 def validate_user(user_object):
     try:
         validate_user_name(user_name=user_object['user_name'])
-        if not len(user_object['full_name']) > 5:
-            raise InvalidFullName
+        validate_user_full_name(user_full_name=user_object['full_name'])
         if not (user_object['gender'] == 'M' or user_object['gender'] == 'F' or user_object['gender'] == 'O'):
             raise InvalidGender
 
@@ -37,6 +49,7 @@ def validate_user(user_object):
             raise InvalidAccountType
         validate_user_email(user_object)
         validate_user_password(user_object['password'])
+        validate_user_contact_number(user_object['contact_number'])
 
     except InvalidUsernameLength:
         raise InvalidUsernameLength
@@ -104,14 +117,14 @@ class UserSignup(APIView):
         try:
             received_data = self.request.data
 
-            user_name = str(received_data.get('user_name')).lower()
-            gender = str(received_data.get('gender'))
-            full_name = str(received_data.get('full_name'))
-            account_type = str(received_data.get('account_type'))
-            email_address = str(received_data.get('email_address'))
-            contact_number = str(received_data.get('contact_number'))
-            about_yourself = str(received_data.get('about_yourself'))
-            password = str(received_data.get('password'))
+            user_name = (str(received_data.get('user_name')).lower()).strip()
+            gender = (str(received_data.get('gender'))).strip()
+            full_name = (str(received_data.get('full_name'))).strip()
+            account_type = (str(received_data.get('account_type'))).strip()
+            email_address = (str(received_data.get('email_address'))).strip()
+            contact_number = (str(received_data.get('contact_number'))).strip()
+            about_yourself = (str(received_data.get('about_yourself'))).strip()
+            password = (str(received_data.get('password'))).strip()
             user_id = str(uuid.uuid4())
             collection_name = db["user_accounts"]
 
@@ -184,3 +197,19 @@ class UserSignup(APIView):
         except InvalidEmailAlreadyExists:
             return JsonResponse({"error": "Email already registered with someone else."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        except InvalidAccountType:
+            return JsonResponse({"error": "The account type can be only Student or Alumni."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        except InvalidEmailHost:
+            return JsonResponse({"error": "Please use your college email address for registration, "
+                                          "and not the private email address."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        except InvalidFullName:
+            return JsonResponse({"error": "The full name should not contain any letter except Alphabets."})
+        except InvalidLengthPassword:
+            return JsonResponse({})
+        except InvalidUserContactNotDigit:
+            return JsonResponse({})
+        except InvalidUserContactLengthNot10:
+            return JsonResponse({})

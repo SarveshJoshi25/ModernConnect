@@ -33,5 +33,14 @@ class InvalidFullName(Exception):
 class InvalidEmailAlreadyExists(Exception):
     pass
 
+
 class InvalidLengthPassword(Exception):
+    pass
+
+
+class InvalidUserContactNotDigit(Exception):
+    pass
+
+
+class InvalidUserContactLengthNot10(Exception):
     pass
