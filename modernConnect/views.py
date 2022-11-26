@@ -1,7 +1,7 @@
 import random
 from django.core.mail import send_mail
 from django.http import JsonResponse
-from rest_framework import viewsets, status, generics, permissions
+from rest_framework import status
 from rest_framework.views import APIView
 import uuid
 from .exceptions import InvalidUsernameLength, InvalidUsernameInvalidLetters, InvalidUsernameUnderscore, \
@@ -112,6 +112,9 @@ def validate_user_email(user):
     return True
 
 
+
+# View calls below.
+
 class UserSignup(APIView):
     def post(self, request) -> JsonResponse:
         try:
@@ -213,3 +216,10 @@ class UserSignup(APIView):
             return JsonResponse({})
         except InvalidUserContactLengthNot10:
             return JsonResponse({})
+
+    def get(self, request) -> JsonResponse:
+        return JsonResponse({"error": "A POST Request is expceted on this URL."},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+
