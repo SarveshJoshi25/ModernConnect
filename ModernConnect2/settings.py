@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     "modernConnect",
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "rest_framework",
+    "rest_framework.authtoken",
 ]
 
 MIDDLEWARE = [
@@ -132,6 +134,17 @@ EMAIL_USE_TLS = True
 EMAIL_PORT = 587
 EMAIL_HOST_USER = email_host_address
 EMAIL_HOST_PASSWORD = email_host_address_password
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ]
+}
+
+AUTH_USER_MODEL = 'modernConnect.UserAccount'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
