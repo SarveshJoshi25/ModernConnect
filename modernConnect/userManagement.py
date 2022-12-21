@@ -4,6 +4,7 @@ from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
 from django.db import models
 
 
+
 # Use this only user for both User and Alumni
 class MyAccountManager(BaseUserManager):
     def create_user(self, user_id, user_name, user_email, user_password, user_full_name, user_gender,
@@ -22,7 +23,11 @@ class MyAccountManager(BaseUserManager):
         )
 
         user.set_password(user_password)
+        user.is_active = False
+        user.is_authenticated = False
+
         user.save(using=self._db)
+
         return user
 
     def create_superuser(self, email_address, password):

@@ -6,8 +6,8 @@ from .userManagement import MyAccountManager
 
 
 class UserAccount(AbstractBaseUser):
-    user_id = models.UUIDField(verbose_name="user_id", max_length=120, unique=True, blank=False, null=False,
-                               editable=True, primary_key=True)
+    user_id = models.CharField(verbose_name="user_id", max_length=120, unique=True, blank=False, null=False,
+                               editable=False, primary_key=True)
     user_name = models.CharField(verbose_name="user_name", max_length=20, unique=True, blank=False, null=False,
                                  default=None)
     user_email = models.EmailField(verbose_name="user_email", max_length=60, unique=True, blank=True, null=True,

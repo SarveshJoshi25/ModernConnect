@@ -11,9 +11,10 @@ from utils import db
 from email_validator import validate_email, EmailNotValidError
 from .models import UserAccount
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 import jwt
 from config import jwt_secret
+from rest_framework.authtoken.models import Token
 
 
 def encrypt_password(password: str) -> str:
@@ -102,6 +103,10 @@ def generate_jwt_token(data):
     return jwt.encode({"user_id": data["user_id"], "account_type": data["account_type"]}, jwt_secret, algorithm="HS256")
 
 
+def decode_jwt_token(received_token: str):
+    return jwt.decode(received_token, jwt_secret, algorithms="HS256")
+
+
 # View calls below.
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -133,11 +138,15 @@ def UserSignup(request):
         }
         validate_user(user_object)
         account = UserAccount.serialize(UserAccount(), data=user_object)
-
+        account.is_active = True
         account.save()
         send_verification_email(user_object)
+
+        token = Token.objects.create(user=account)
+
         jsonResponse = JsonResponse({"Response": "Account created successfully! "})
         jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_object))
+        jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
         return jsonResponse
 
 
@@ -184,3 +193,48 @@ def UserSignup(request):
     except InvalidUserContactLengthNot10:
         return JsonResponse({"error": "Invalid Contact number."},
                             status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def verifyEmailAddress(request):
+    # Requirements: Header - Authorization: Token <token sent by server either after signup or login>
+    # Cookie - JWT_TOKEN : set by server as a cookie, don't remove it.
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        authenticate_this = decode_jwt_token(received_token)
+
+        received_data = request.data
+        user_entered_otp = str(received_data.get('otp')).strip()
+
+        user_collection = db['user_accounts']
+        collection_name = db['email_validation']
+        requesting_user = user_collection.find_one({'user_id': authenticate_this.get("user_id")})
+        if requesting_user['user_if_email_verified']:
+            return JsonResponse({"response": "Your email is already verified!"}, status=status.HTTP_200_OK)
+
+        if not len(list(collection_name.find({'user_id': authenticate_this.get("user_id")}))):
+            return JsonResponse({"error": "Can't find your request for OTP at database. Please re-request for "
+                                          "Verification Email."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        if not bcrypt.checkpw(password=user_entered_otp.encode("utf-8"), hashed_password=(
+                collection_name.find_one({"user_id": authenticate_this.get("user_id")})['otp']).encode("utf-8")):
+            return JsonResponse({"error": "Incorrect OTP."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        collection_name.delete_one({"user_id": authenticate_this.get("user_id")})
+
+        user_collection.find_one_and_update(
+            filter={
+                'user_id': str(authenticate_this.get("user_id"))
+            },
+            update=
+            {
+                "$set": {
+                    'user_if_email_verified': True
+                }
+            })
+
+        return JsonResponse({"response": "Your Email has been verified. Now you can access all features for the Users"},
+                            status=status.HTTP_200_OK)
+
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)

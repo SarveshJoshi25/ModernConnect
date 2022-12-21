@@ -21,7 +21,7 @@ class sendVerificationEmail(threading.Thread):
         try:
             print("Sending an verification email to {0} at {1}".format(self.user['email_address'],
                                                                        datetime.datetime.now()))
-            collection_name = db['alumni_email_validation']
+            collection_name = db['email_validation']
             otp = str(random.randrange(100000, 999999))
             collection_name.delete_many({
                 "user_id": self.user['user_id']
