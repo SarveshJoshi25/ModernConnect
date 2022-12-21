@@ -1,5 +1,4 @@
-import random
-from django.core.mail import send_mail
+from .threads import sendVerificationEmail
 from django.http import JsonResponse
 from rest_framework import status
 import uuid
@@ -9,7 +8,6 @@ from .exceptions import InvalidUsernameLength, InvalidUsernameInvalidLetters, In
 import string
 import bcrypt
 from utils import db
-import datetime
 from email_validator import validate_email, EmailNotValidError
 from .models import UserAccount
 from rest_framework.decorators import api_view, permission_classes
@@ -70,23 +68,7 @@ def validate_user(user_object):
 
 
 def send_verification_email(user):
-    collection_name = db['alumni_email_validation']
-    otp = str(random.randrange(100000, 999999))
-    collection_name.delete_many({
-        "user_id": user['user_id']
-    })
-    collection_name.insert_one(
-        {
-            "user_id": user['user_id'],
-            "otp": encrypt_password(str(otp)),
-            "timestamp": datetime.datetime.now()
-        }
-    )
-    send_mail('Verification for ModernConnect.', """Hello {0}, 
-    \nThis Email is to inform you about registration of this email address on ModernConnect. 
-    \nIgnore this message if you've not initiated this process. \nIf you've initiated this process, Please consider {1} as your One Time Password to verify this account! """.format(
-        user['full_name'], otp),
-              'sjfrommodernconnect@gmail.com', [user['email_address']], fail_silently=False)
+    sendVerificationEmail(user).start()
 
 
 def validate_user_name(user_name: str):

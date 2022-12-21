@@ -12,8 +12,6 @@ class UserAccount(AbstractBaseUser):
                                  default=None)
     user_email = models.EmailField(verbose_name="user_email", max_length=60, unique=True, blank=True, null=True,
                                    default=None)
-    user_password = models.CharField(verbose_name="user_password", max_length=120, unique=False, blank=False,
-                                     null=False, default=None)
     user_full_name = models.CharField(verbose_name="user_full_name", unique=False, blank=False, null=False,
                                       max_length=60)
     user_gender = models.CharField(verbose_name="user_gender", unique=False, blank=False, null=False, max_length=6)

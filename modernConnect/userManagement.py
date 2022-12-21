@@ -12,7 +12,6 @@ class MyAccountManager(BaseUserManager):
             user_id=user_id,
             user_name=user_name,
             user_email=user_email,
-            user_password=user_password,
             user_full_name=user_full_name,
             user_gender=user_gender,
             user_account_type=user_account_type,
@@ -29,7 +28,7 @@ class MyAccountManager(BaseUserManager):
     def create_superuser(self, email_address, password):
         user = self.model(
             email_address=email_address,
-            password=password,
+            user_password=password,
         )
         user.is_admin = True
         user.is_active = True
