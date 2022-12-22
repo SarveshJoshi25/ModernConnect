@@ -1,7 +1,6 @@
 from django.db import models
-
+from django.shortcuts import get_object_or_404
 from django.contrib.auth.base_user import AbstractBaseUser
-
 from .userManagement import MyAccountManager
 
 
@@ -21,6 +20,7 @@ class UserAccount(AbstractBaseUser):
     user_bio = models.CharField(verbose_name="user_contact", blank=True, null=True, max_length=480)
     user_if_email_verified = models.BooleanField(verbose_name="user_if_email_verified", default=False)
     is_admin = models.BooleanField(default=False)
+    is_blocked = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
     USERNAME_FIELD = "user_id"
@@ -29,7 +29,6 @@ class UserAccount(AbstractBaseUser):
         db_table = "user_accounts"
 
     objects = MyAccountManager()
-
 
     def has_perms(self, perm, obj=None):
         return self.is_superuser

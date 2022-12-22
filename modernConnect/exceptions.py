@@ -44,3 +44,7 @@ class InvalidUserContactNotDigit(Exception):
 
 class InvalidUserContactLengthNot10(Exception):
     pass
+
+
+class UserDoesNotExistsWhileLogin(Exception):
+    pass

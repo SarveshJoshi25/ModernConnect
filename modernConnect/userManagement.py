@@ -1,8 +1,4 @@
-import uuid
-
 from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
-from django.db import models
-
 
 
 # Use this only user for both User and Alumni
@@ -18,6 +14,7 @@ class MyAccountManager(BaseUserManager):
             user_account_type=user_account_type,
             user_contact=user_contact,
             user_bio=user_bio,
+            user_ia_blocked=False,
             user_if_email_verified=user_if_email_verified,
             alumni_if_access_given=user_if_access_given,
         )
@@ -40,8 +37,3 @@ class MyAccountManager(BaseUserManager):
         user.is_staff = True
         user.is_superuser = True
         user.save(using=self._db)
-
-
-
-
-

@@ -1,3 +1,5 @@
+import datetime
+
 from .threads import sendVerificationEmail
 from django.http import JsonResponse
 from rest_framework import status
@@ -15,6 +17,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticate
 import jwt
 from config import jwt_secret
 from rest_framework.authtoken.models import Token
+from django.shortcuts import get_object_or_404
 
 
 def encrypt_password(password: str) -> str:
@@ -99,8 +102,8 @@ def validate_user_email(user):
     return True
 
 
-def generate_jwt_token(data):
-    return jwt.encode({"user_id": data["user_id"], "account_type": data["account_type"]}, jwt_secret, algorithm="HS256")
+def generate_jwt_token(user_id, account_type):
+    return jwt.encode({"user_id": user_id, "account_type": account_type}, jwt_secret, algorithm="HS256")
 
 
 def decode_jwt_token(received_token: str):
@@ -111,6 +114,50 @@ def decode_jwt_token(received_token: str):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def UserSignup(request):
+
+    """
+
+    How to create a user using API Call?
+
+    Requirements: None.
+    Request type: POST
+
+    1. Request body for Student =
+        Request body: {
+           {
+            "user_name": "sarvesh_joshi",
+            "password": "FakePassword",
+            "email_address": "my_email@moderncoe.edu.in",
+            "full_name": "Sarvesh Joshi",
+            "account_type": "Student",
+            "gender": "M",
+            "contact_number": "1234567890",
+            "about_yourself": "Backend Developer"
+        }
+        :returns Success message, and an OTP is sent on Email for verification.
+
+    2. Request body for Student =
+        Request body: {
+            {
+            "user_name": "sarvesh_joshi",
+            "password": "FakePassword",
+            "email_address": "my_email@gmail.com",
+            "full_name": "Sarvesh Joshi",
+            "account_type": "Student",
+            "gender": "M",
+            "contact_number": "1234567890",
+            "about_yourself": "Backend Developer"
+        }
+    :returns Success message, and an OTP is sent on Email for verification,
+             Two cookies - 1. JWT Token: Keep this set in cookie.
+                           2. Authentication Token: Set "Token + <sent token>"  in Authentication header.
+
+    :exception: KeyErrors, ValidationErrors -> A 406 Error Response will be raised.
+
+    ON SUCCESS -> redirect user to OTP verification page, and send a request verify_email API.
+
+    """
+
     try:
         received_data = request.data
         user_name = (str(received_data.get('user_name')).lower()).strip()
@@ -139,13 +186,15 @@ def UserSignup(request):
         validate_user(user_object)
         account = UserAccount.serialize(UserAccount(), data=user_object)
         account.is_active = True
+        account.last_login = datetime.datetime.now()
         account.save()
         send_verification_email(user_object)
 
         token = Token.objects.create(user=account)
 
         jsonResponse = JsonResponse({"Response": "Account created successfully! "})
-        jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_object))
+        jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_object['user_id'],
+                                                                          user_object['account_type']))
         jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
         return jsonResponse
 
@@ -238,3 +287,48 @@ def verifyEmailAddress(request):
 
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def UserLogin(request):
+    try:
+        received_data = request.data
+
+        user_name = (str(received_data.get('user_name')).lower()).strip()
+        password = (str(received_data.get('password'))).strip()
+
+        user = get_object_or_404(UserAccount, user_name=user_name)
+
+        if user.check_password(password):
+            token = Token.objects.filter(user=user)
+            user_collection = db['user_accounts']
+            user_collection.find_one_and_update(
+                filter={
+                    'user_name': user_name
+                },
+                update=
+                {
+                    "$set": {
+                        'is_active': True,
+                        'last_login': datetime.datetime.now()
+                    }
+                })
+
+            # user.is_active = True
+            # user.last_login = datetime.datetime.now()
+            jsonResponse = JsonResponse({"Response": "Logged In Successfully! "})
+            jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_id=user.user_id,
+                                                                              account_type=user.user_account_type))
+            jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
+            return JsonResponse({"response": "Account Logged In Successfully!"}, status=status.HTTP_200_OK)
+        else:
+            return JsonResponse({"response": "Username and Password didn't match."}, status=status.HTTP_200_OK)
+
+
+    except KeyError:
+        return JsonResponse({"error": "Required fields not found."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+    except UserAccount.DoesNotExist:
+        return JsonResponse({"error": "The Account with given Username doesn't exists."},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
