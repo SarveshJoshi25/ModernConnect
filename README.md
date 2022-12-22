@@ -3,7 +3,7 @@
 
 ModernConnect is a Professional Social Media built exclusively for students and alumnus of Modern College of Engineering, Pune.
 
-This project will allow students to seek help from their Peers and the Alumnus, also share their skills, Post about events, etc. 
+This project will allow students to seek help from their Peers and the Alumni, also share their skills, Post about events, etc. 
 The motto of this project is to increase the overall involvement of the Alumnus with the college and mentor the students for better future opportunities. The Project is currently in the development phase. 
 The Technology Stack for this Project are Python/Django, React, MongoDB
 
