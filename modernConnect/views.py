@@ -1,12 +1,16 @@
 import datetime
 
+import pymongo
+
 from .threads import sendVerificationEmail
 from django.http import JsonResponse
 from rest_framework import status
 import uuid
 from .exceptions import InvalidUsernameLength, InvalidUsernameInvalidLetters, InvalidUsernameUnderscore, \
     InvalidUsernameAlreadyExists, InvalidGender, InvalidAccountType, InvalidEmailHost, InvalidFullName, \
-    InvalidEmailAlreadyExists, InvalidLengthPassword, InvalidUserContactLengthNot10, InvalidUserContactNotDigit
+    InvalidEmailAlreadyExists, InvalidLengthPassword, InvalidUserContactLengthNot10, InvalidUserContactNotDigit, \
+    InvalidInstituteName, InvalidLocation, InvalidEnrollmentYear, InvalidCompletion, InvalidEnrollmentCompletionPair, \
+    InvalidDegree, InvalidStream
 import string
 import bcrypt
 from utils import db
@@ -110,11 +114,52 @@ def decode_jwt_token(received_token: str):
     return jwt.decode(received_token, jwt_secret, algorithms="HS256")
 
 
+def get_user_account_type(received_token: str) -> str:
+    decoded_token = decode_jwt_token(received_token)
+    return str(decoded_token.get("account_type"))
+
+
+def set_degree(degree_id: int):
+    this_degree = db["degrees"].find({"degree_id": int(degree_id)}, {"_id": 0, "degree": 1})
+    return list(this_degree)[0]['degree']
+
+
+def verify_degree(degree_id: int) -> bool:
+    return db["degrees"].find({"degree_id": degree_id}).count() > 0
+
+
+def verify_education(list_of_education, user_id):
+    for education in list_of_education:
+        if len(str(education.get("institute")).strip()) == 0:
+            raise InvalidInstituteName
+
+        if len(str(education.get("location")).strip()) == 0:
+            raise InvalidLocation
+
+        if not (str(education.get("enrollment_year")).strip()).isdigit():
+            raise InvalidEnrollmentYear
+
+        if not (str(education.get("completion_year")).strip()).isdigit():
+            raise InvalidCompletion
+
+        if int(education.get("enrollment_year")) > int(education.get("completion_year")):
+            raise InvalidEnrollmentCompletionPair
+
+        if not verify_degree(int(education.get("degree"))):
+            raise InvalidDegree
+
+        if len(str(education.get("stream")).strip()) == 0:
+            raise InvalidStream
+        education["user_id"] = user_id
+        education["degree"] = set_degree(education.get("degree"))
+        education["education_id"] = str(uuid.uuid4())
+    return list_of_education
+
+
 # View calls below.
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def UserSignup(request):
-
     """
 
     How to create a user using API Call?
@@ -301,7 +346,8 @@ def UserLogin(request):
         user = get_object_or_404(UserAccount, user_name=user_name)
 
         if user.check_password(password):
-            token = Token.objects.filter(user=user)
+            token = Token.objects.update_or_create(user=user)[0]
+            # token = Token.objects.create(user=user)
             user_collection = db['user_accounts']
             user_collection.find_one_and_update(
                 filter={
@@ -321,9 +367,10 @@ def UserLogin(request):
             jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_id=user.user_id,
                                                                               account_type=user.user_account_type))
             jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
-            return JsonResponse({"response": "Account Logged In Successfully!"}, status=status.HTTP_200_OK)
+            return jsonResponse
         else:
-            return JsonResponse({"response": "Username and Password didn't match."}, status=status.HTTP_200_OK)
+            return JsonResponse({"response": "Username and Password didn't match."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
     except KeyError:
@@ -332,3 +379,62 @@ def UserLogin(request):
     except UserAccount.DoesNotExist:
         return JsonResponse({"error": "The Account with given Username doesn't exists."},
                             status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_degree_types(request):
+    degree_collection = db["degrees"]
+    degrees = degree_collection.find({}, {"degree_id": 1, "degree": 1, "_id": 0})
+    degrees = degrees.sort("degree_id", pymongo.ASCENDING)
+    return JsonResponse({"degrees": list(degrees)}, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def UserAddEducationalDetails(request):
+    """
+
+
+{
+    "educational_data": [{
+    "institute": "Modern College of Engineering, Pune",
+    "location": "Pune, Maharashtra",
+    "enrollment_year": "2021",
+    "completion_year": "2024",
+    "degree": "2",
+    "stream": "Information Technology",
+    "grade": "8.7"
+    }]
+}
+    :param request:
+    :return:
+    """
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        received_data = request.data
+        list_of_education = list(received_data.get("educational_data"))
+        decoded_token = decode_jwt_token(received_token)
+        list_of_education = verify_education(list_of_education, decoded_token["user_id"])
+        db["education_details"].insert_many(list_of_education)
+        return JsonResponse({"success": "Education added successfully."}, status=status.HTTP_200_OK)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidInstituteName:
+        return JsonResponse({"error", "Invalid Institute Name."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidLocation:
+        return JsonResponse({"error", "Invalid Location."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidEnrollmentYear:
+        return JsonResponse({"error": "Invalid Enrollment Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidCompletion:
+        return JsonResponse({"error": "Invalid Completion Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidEnrollmentCompletionPair:
+        return JsonResponse({"error": "Enrollment Year can't be greater than Completion Year."},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidDegree:
+        return JsonResponse({"error": "Invalid Degree ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidStream:
+        return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+

@@ -48,3 +48,31 @@ class InvalidUserContactLengthNot10(Exception):
 
 class UserDoesNotExistsWhileLogin(Exception):
     pass
+
+
+class InvalidInstituteName(Exception):
+    pass
+
+
+class InvalidLocation(Exception):
+    pass
+
+
+class InvalidEnrollmentYear(Exception):
+    pass
+
+
+class InvalidCompletion(Exception):
+    pass
+
+
+class InvalidEnrollmentCompletionPair(Exception):
+    pass
+
+
+class InvalidDegree(Exception):
+    pass
+
+
+class InvalidStream(Exception):
+    pass
