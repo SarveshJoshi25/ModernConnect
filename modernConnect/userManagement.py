@@ -1,6 +1,5 @@
 from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
 
-
 # Use this only user for both User and Alumni
 class MyAccountManager(BaseUserManager):
     def create_user(self, user_id, user_name, user_email, user_password, user_full_name, user_gender,

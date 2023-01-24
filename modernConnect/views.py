@@ -438,3 +438,27 @@ def UserAddEducationalDetails(request):
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def getEducationalDetails(request):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        educational_details = db["education_details"].find({"user_id": decoded_token['user_id']}, {"_id": 0})
+        educational_details = educational_details.sort("enrollment_year", pymongo.ASCENDING)
+        educational_details = list(educational_details)
+
+        return JsonResponse({"educational_details": educational_details}, status=status.HTTP_200_OK)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def userLogout(request):
+    db["authtoken_token"].delete_one(filter={"user_id": decode_jwt_token(request.COOKIES.get("JWT_TOKEN"))["user_id"]})
+    return JsonResponse({"success": "Logged Out."})
+# delete the header authentication from front-end.
