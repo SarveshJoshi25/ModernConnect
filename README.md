@@ -51,7 +51,7 @@ Users can be of two types, either a Student or an Alumni.     \
 #### Log-in the User
 
 ```http
-  POST /api/v1/user/verify_email/
+  POST /api/v1/user/login/
 ```
 **All parameters are required**
 | Parameter | Type     | Description                       |
