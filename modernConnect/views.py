@@ -456,6 +456,46 @@ def getEducationalDetails(request):
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def editEducationalDetailsSeparate(request, education_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        fetched_details = db["education_details"].find_one({"user_id": decoded_token['user_id'],
+                                                            "education_id": education_id})
+        if fetched_details is None:
+            return JsonResponse({"error": "Invalid Educational ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        received_data = request.data
+        education_list = [received_data]
+        education_list = verify_education(education_list, decoded_token["user_id"])
+        education_list[0]["education_id"] = education_id
+        db["education_details"].delete_one(filter={"user_id": decoded_token['user_id'],
+                                                   "education_id": education_id})
+        db["education_details"].insert_one(education_list[0])
+        return JsonResponse({"success": "Educational details are updated!"}, status=status.HTTP_200_OK)
+
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidInstituteName:
+        return JsonResponse({"error", "Invalid Institute Name."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidLocation:
+        return JsonResponse({"error", "Invalid Location."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidEnrollmentYear:
+        return JsonResponse({"error": "Invalid Enrollment Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidCompletion:
+        return JsonResponse({"error": "Invalid Completion Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidEnrollmentCompletionPair:
+        return JsonResponse({"error": "Enrollment Year can't be greater than Completion Year."},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidDegree:
+        return JsonResponse({"error": "Invalid Degree ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidStream:
+        return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def userLogout(request):
