@@ -547,25 +547,23 @@ def deleteEducationalDetailsSeparate(request, education_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def UserAddWorkExperience(request):
-
     """
-
-{
-    "work_data":
-    [
-        {
-            "work_designation": "Backend Developer Intern",
-            "work_organization": "Rhythmflows Solutions Pvt. Ltd.",
-            "first_day_at_work": "01-08-2022",
-            "last_day_at_work": "01-11-2022",
-            "is_current_employer": "No",
-            "work_description": "Developed features for the company's Financial Reconciliation Software. The day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgreSQL databases and sending responses to the front-end using JSON and collaborating with Front-end developers to develop full-stack features."
-        }
-    ]
-}
-
-    :param request:
-    :return:
+    {
+        "work_data":
+        [
+            {
+                "work_designation": "Backend Developer Intern",
+                "work_organization": "Rhythmflows Solutions Pvt. Ltd.",
+                "first_day_at_work": "01-08-2022",
+                "last_day_at_work": "01-11-2022",
+                "is_current_employer": "No",
+                "work_description": "Developed features for the company's Financial Reconciliation Software. The
+                day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgreSQL
+                databases and sending responses to the front-end using JSON and collaborating with Front-end developers
+                to develop full-stack features."
+            }
+        ]
+    }
     """
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
@@ -580,12 +578,12 @@ def UserAddWorkExperience(request):
                                   is_current_employer=verified_work["is_current_employer"],
                                   last_day_at_work=verified_work["last_day_at_work"],
                                   work_description=verified_work["work_description"],
-                                  user_id=decoded_token["user_id"])
+                                  user_id=decoded_token["user_id"],
+                                  work_experience_id=uuid.uuid4())
             work.save()
         return JsonResponse({"success": "Work Experience added successfully."}, status=status.HTTP_200_OK)
-
     except ValidationError as v:
-        return JsonResponse({"error": v.message_dict}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"error": "Something went wrong."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except InvalidInstituteName:
@@ -605,3 +603,39 @@ def UserAddWorkExperience(request):
         return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except AttributeError:
+        return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def GetWorkDetails(request):
+    received_token = request.COOKIES.get("JWT_TOKEN")
+    decoded_token = decode_jwt_token(received_token)
+    work_details = WorkExperience.objects.filter(user_id=decoded_token['user_id']).order_by(
+        'first_day_at_work').values()
+    return JsonResponse({"work_details": list(work_details)}, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def editWorkDetailsSeparate(request, work_id):
+    received_token = request.COOKIES.get("JWT_TOKEN")
+    decoded_token = decode_jwt_token(received_token)
+    fetched_details = WorkExperience.objects.filter(user_id=decoded_token['user_id'], work_experience_id=work_id)
+    if fetched_details.count() == 0:
+        return JsonResponse({"error": "Invalid Work ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    received_data = request.data
+    work_list = [received_data]
+    work_list = verify_work(work_list, decoded_token["user_id"])
+    WorkExperience.objects.filter(user_id=decoded_token['user_id'], work_experience_id=work_id).delete()
+    work = WorkExperience(work_designation=work_list[0]["work_designation"],
+                          work_organization=work_list[0]["work_organization"],
+                          first_day_at_work=work_list[0]["first_day_at_work"],
+                          is_current_employer=work_list[0]["is_current_employer"],
+                          last_day_at_work=work_list[0]["last_day_at_work"],
+                          work_description=work_list[0]["work_description"],
+                          user_id=decoded_token["user_id"],
+                          work_experience_id=work_id)
+    work.save()
+    return JsonResponse({"success": "Work Experience is updated!"}, status=status.HTTP_200_OK)
