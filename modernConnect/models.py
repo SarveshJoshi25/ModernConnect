@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -50,3 +52,16 @@ class UserAccount(AbstractBaseUser):
         self.set_password(raw_password=str(data['password']))
 
         return self
+
+
+class WorkExperience(models.Model):
+    work_experience_id = models.CharField(primary_key=True, default=str(uuid.uuid4()), editable=False, max_length=60)
+    work_designation = models.CharField(max_length=60, null=False, editable=True,
+                                        error_messages={"null": "Designation can't be null."})
+    work_organization = models.CharField(max_length=120, null=False, editable=True,
+                                         error_messages={"null": "Work Organization can't be null."})
+    first_day_at_work = models.DateField()
+    is_current_employer = models.BooleanField(editable=True)
+    last_day_at_work = models.DateField(null=True)
+    work_description = models.CharField(max_length=1200, null=True, editable=True)
+    user_id = models.CharField(editable=False, max_length=60)

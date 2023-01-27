@@ -10,17 +10,18 @@ from .exceptions import InvalidUsernameLength, InvalidUsernameInvalidLetters, In
     InvalidUsernameAlreadyExists, InvalidGender, InvalidAccountType, InvalidEmailHost, InvalidFullName, \
     InvalidEmailAlreadyExists, InvalidLengthPassword, InvalidUserContactLengthNot10, InvalidUserContactNotDigit, \
     InvalidInstituteName, InvalidLocation, InvalidEnrollmentYear, InvalidCompletion, InvalidEnrollmentCompletionPair, \
-    InvalidDegree, InvalidStream
+    InvalidDegree, InvalidStream, InvalidDesignation, InvalidOrganization, InvalidFirstDayAtWork, InvalidLastDayAtWork
 import string
 import bcrypt
 from utils import db
 from email_validator import validate_email, EmailNotValidError
-from .models import UserAccount
+from .models import UserAccount, WorkExperience
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 import jwt
 from config import jwt_secret
 from rest_framework.authtoken.models import Token
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 
 
@@ -156,6 +157,23 @@ def verify_education(list_of_education, user_id):
     return list_of_education
 
 
+def verify_work(list_of_work, user_id):
+    for each_work_experience in list_of_work:
+        if len(each_work_experience["work_designation"]) <= 0:
+            raise InvalidDesignation
+        if len(each_work_experience["work_organization"]) <= 0:
+            raise InvalidOrganization
+        first_day_at_work = datetime.datetime.strptime(each_work_experience["first_day_at_work"], "%Y-%m-%d").date()
+        if first_day_at_work > datetime.date.today():
+            raise InvalidFirstDayAtWork
+        if not bool(each_work_experience["is_current_employer"]):
+            last_day_at_work = datetime.datetime.strptime(each_work_experience["last_day_at_work"], "%Y-%m-%d").date()
+            if first_day_at_work > last_day_at_work:
+                raise InvalidLastDayAtWork
+        each_work_experience["user_id"] = user_id
+    return list_of_work
+
+
 # View calls below.
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -287,6 +305,16 @@ def UserSignup(request):
     except InvalidUserContactLengthNot10:
         return JsonResponse({"error": "Invalid Contact number."},
                             status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def userLogout(request):
+    db["authtoken_token"].delete_one(filter={"user_id": decode_jwt_token(request.COOKIES.get("JWT_TOKEN"))["user_id"]})
+    return JsonResponse({"success": "Logged Out."})
+
+
+# delete the header authentication from front-end.
 
 
 @api_view(["POST"])
@@ -496,9 +524,84 @@ def editEducationalDetailsSeparate(request, education_id):
         return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
-@api_view(["GET"])
+@api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
-def userLogout(request):
-    db["authtoken_token"].delete_one(filter={"user_id": decode_jwt_token(request.COOKIES.get("JWT_TOKEN"))["user_id"]})
-    return JsonResponse({"success": "Logged Out."})
-# delete the header authentication from front-end.
+def deleteEducationalDetailsSeparate(request, education_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        fetched_details = db["education_details"].find_one({"user_id": decoded_token['user_id'],
+                                                            "education_id": education_id})
+        if fetched_details is None:
+            return JsonResponse({"error": "Invalid Educational ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        db["education_details"].delete_one(filter={"user_id": decoded_token['user_id'],
+                                                   "education_id": education_id})
+        return JsonResponse({"success": "Educational detail is deleted successfully!"}, status=status.HTTP_200_OK)
+
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def UserAddWorkExperience(request):
+
+    """
+
+{
+    "work_data":
+    [
+        {
+            "work_designation": "Backend Developer Intern",
+            "work_organization": "Rhythmflows Solutions Pvt. Ltd.",
+            "first_day_at_work": "01-08-2022",
+            "last_day_at_work": "01-11-2022",
+            "is_current_employer": "No",
+            "work_description": "Developed features for the company's Financial Reconciliation Software. The day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgreSQL databases and sending responses to the front-end using JSON and collaborating with Front-end developers to develop full-stack features."
+        }
+    ]
+}
+
+    :param request:
+    :return:
+    """
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        received_data = request.data
+        list_of_work = list(received_data.get("work_data"))
+        decoded_token = decode_jwt_token(received_token)
+        list_of_work = verify_work(list_of_work, decoded_token["user_id"])
+        for verified_work in list_of_work:
+            work = WorkExperience(work_designation=verified_work["work_designation"],
+                                  work_organization=verified_work["work_organization"],
+                                  first_day_at_work=verified_work["first_day_at_work"],
+                                  is_current_employer=verified_work["is_current_employer"],
+                                  last_day_at_work=verified_work["last_day_at_work"],
+                                  work_description=verified_work["work_description"],
+                                  user_id=decoded_token["user_id"])
+            work.save()
+        return JsonResponse({"success": "Work Experience added successfully."}, status=status.HTTP_200_OK)
+
+    except ValidationError as v:
+        return JsonResponse({"error": v.message_dict}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidInstituteName:
+        return JsonResponse({"error", "Invalid Institute Name."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidLocation:
+        return JsonResponse({"error", "Invalid Location."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidEnrollmentYear:
+        return JsonResponse({"error": "Invalid Enrollment Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidCompletion:
+        return JsonResponse({"error": "Invalid Completion Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidEnrollmentCompletionPair:
+        return JsonResponse({"error": "Enrollment Year can't be greater than Completion Year."},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidDegree:
+        return JsonResponse({"error": "Invalid Degree ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except InvalidStream:
+        return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)

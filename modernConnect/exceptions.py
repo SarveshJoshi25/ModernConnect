@@ -76,3 +76,14 @@ class InvalidDegree(Exception):
 
 class InvalidStream(Exception):
     pass
+
+class InvalidDesignation(Exception):
+    pass
+
+class InvalidOrganization(Exception):
+    pass
+
+class InvalidFirstDayAtWork(Exception):
+    pass
+class InvalidLastDayAtWork(Exception):
+    pass
