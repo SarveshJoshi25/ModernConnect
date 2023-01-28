@@ -20,8 +20,8 @@ urlpatterns = [
     path("user/get/work_details/", views.GetWorkDetails, name="Get Work Details"),
     path("user/update/work_details/<str:work_id>/", views.editWorkDetailsSeparate,
          name="Edit Work Details Separate"),
-    # path("user/delete/educational_details/<str:education_id>", views.deleteWorkDetailsSeparate,
-    #      name="Delete Work Details Separate"),
+    path("user/delete/work_details/<str:work_id>/", views.deleteWorkDetails,
+         name="Delete Work Details Separate"),
 
     path("get/degrees/", views.get_degree_types, name="Get Degrees"),
 

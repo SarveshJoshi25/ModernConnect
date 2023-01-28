@@ -639,3 +639,19 @@ def editWorkDetailsSeparate(request, work_id):
                           work_experience_id=work_id)
     work.save()
     return JsonResponse({"success": "Work Experience is updated!"}, status=status.HTTP_200_OK)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def deleteWorkDetails(request, work_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        deleted_ = WorkExperience.objects.filter(user_id=decoded_token['user_id'], work_experience_id=work_id).delete()
+        if deleted_[0] == 0:
+            return JsonResponse({"error": "Requested Work Experience not found."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"success": "Work Experience deleted successfully!"}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
