@@ -65,3 +65,19 @@ class WorkExperience(models.Model):
     last_day_at_work = models.DateField(null=True)
     work_description = models.CharField(max_length=1200, null=True, editable=True)
     user_id = models.CharField(editable=False, max_length=60)
+
+
+class EducationalExperience(models.Model):
+    education_id = models.CharField(primary_key=True, default=str(uuid.uuid4()), editable=False, max_length=60)
+    institute = models.CharField(max_length=120, null=False, editable=True,
+                                 error_messages={"null": "Institute can't be null."})
+    location = models.CharField(max_length=120, null=False, editable=True,
+                                error_messages={"null": "Institute Location can't be null."})
+    enrollment_year = models.IntegerField()
+    completion_year = models.IntegerField()
+    degree = models.CharField(max_length=120, null=False, editable=True,
+                              error_messages={"null": "Degree can't be null."})
+    stream = models.CharField(max_length=120, null=False, editable=True,
+                              error_messages={"null": "Stream can't be null."})
+    grade = models.CharField(max_length=20, null=True, editable=True)
+    user_id = models.CharField(editable=False, max_length=60)

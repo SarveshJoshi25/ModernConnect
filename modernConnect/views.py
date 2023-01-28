@@ -15,7 +15,7 @@ import string
 import bcrypt
 from utils import db
 from email_validator import validate_email, EmailNotValidError
-from .models import UserAccount, WorkExperience
+from .models import UserAccount, WorkExperience, EducationalExperience
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 import jwt
@@ -130,6 +130,7 @@ def verify_degree(degree_id: int) -> bool:
 
 
 def verify_education(list_of_education, user_id):
+    verified_education = []
     for education in list_of_education:
         if len(str(education.get("institute")).strip()) == 0:
             raise InvalidInstituteName
@@ -151,10 +152,18 @@ def verify_education(list_of_education, user_id):
 
         if len(str(education.get("stream")).strip()) == 0:
             raise InvalidStream
-        education["user_id"] = user_id
-        education["degree"] = set_degree(education.get("degree"))
-        education["education_id"] = str(uuid.uuid4())
-    return list_of_education
+        verified_education.append(EducationalExperience(
+            institute=str(education.get("institute")).strip(),
+            location=str(education.get("location")).strip(),
+            enrollment_year=int(str(education.get("enrollment_year")).strip()),
+            completion_year=int(str(education.get("completion_year")).strip()),
+            degree=set_degree(education.get("degree")),
+            user_id=user_id,
+            stream=str(education.get("stream")).strip(),
+            education_id=str(uuid.uuid4()),
+            grade=education.get("grade")
+        ))
+    return verified_education
 
 
 def verify_work(list_of_work, user_id):
@@ -443,8 +452,9 @@ def UserAddEducationalDetails(request):
         received_data = request.data
         list_of_education = list(received_data.get("educational_data"))
         decoded_token = decode_jwt_token(received_token)
-        list_of_education = verify_education(list_of_education, decoded_token["user_id"])
-        db["education_details"].insert_many(list_of_education)
+        verified_education = verify_education(list_of_education, decoded_token["user_id"])
+        for v in verified_education:
+            v.save()
         return JsonResponse({"success": "Education added successfully."}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -473,10 +483,8 @@ def getEducationalDetails(request):
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
-        educational_details = db["education_details"].find({"user_id": decoded_token['user_id']}, {"_id": 0})
-        educational_details = educational_details.sort("enrollment_year", pymongo.ASCENDING)
+        educational_details = EducationalExperience.objects.filter(user_id=decoded_token['user_id']).order_by("enrollment_year").values()
         educational_details = list(educational_details)
-
         return JsonResponse({"educational_details": educational_details}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -490,17 +498,14 @@ def editEducationalDetailsSeparate(request, education_id):
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
-        fetched_details = db["education_details"].find_one({"user_id": decoded_token['user_id'],
-                                                            "education_id": education_id})
-        if fetched_details is None:
+        fetched_details = EducationalExperience.objects.filter(user_id=decoded_token['user_id'], education_id=education_id)
+        if fetched_details.count() == 0:
             return JsonResponse({"error": "Invalid Educational ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
         received_data = request.data
-        education_list = [received_data]
-        education_list = verify_education(education_list, decoded_token["user_id"])
-        education_list[0]["education_id"] = education_id
-        db["education_details"].delete_one(filter={"user_id": decoded_token['user_id'],
-                                                   "education_id": education_id})
-        db["education_details"].insert_one(education_list[0])
+        educational_list = [received_data]
+        educational_list = verify_education(educational_list, decoded_token["user_id"])
+        EducationalExperience.objects.filter(user_id=decoded_token['user_id'], education_id=education_id).delete()
+        educational_list[0].save()
         return JsonResponse({"success": "Educational details are updated!"}, status=status.HTTP_200_OK)
 
     except KeyError:
@@ -530,14 +535,11 @@ def deleteEducationalDetailsSeparate(request, education_id):
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
-        fetched_details = db["education_details"].find_one({"user_id": decoded_token['user_id'],
-                                                            "education_id": education_id})
-        if fetched_details is None:
-            return JsonResponse({"error": "Invalid Educational ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-        db["education_details"].delete_one(filter={"user_id": decoded_token['user_id'],
-                                                   "education_id": education_id})
-        return JsonResponse({"success": "Educational detail is deleted successfully!"}, status=status.HTTP_200_OK)
-
+        deleted_ = EducationalExperience.objects.filter(user_id=decoded_token['user_id'], education_id=education_id).delete()
+        if deleted_[0] == 0:
+            return JsonResponse({"error": "Requested Educational Experience not found."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"success": "Educational Experience deleted successfully!"}, status=status.HTTP_200_OK)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
@@ -649,7 +651,8 @@ def deleteWorkDetails(request, work_id):
         decoded_token = decode_jwt_token(received_token)
         deleted_ = WorkExperience.objects.filter(user_id=decoded_token['user_id'], work_experience_id=work_id).delete()
         if deleted_[0] == 0:
-            return JsonResponse({"error": "Requested Work Experience not found."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+            return JsonResponse({"error": "Requested Work Experience not found."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
         return JsonResponse({"success": "Work Experience deleted successfully!"}, status=status.HTTP_200_OK)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)

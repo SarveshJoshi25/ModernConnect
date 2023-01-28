@@ -6,7 +6,6 @@ urlpatterns = [
     path("user/signup/", views.UserSignup, name="User Signup"),
     path("user/login/", views.UserLogin, name="User Login"),
     path("user/logout/", views.userLogout, name="User Logout"),
-
     path("user/verify_email/", views.verifyEmailAddress, name="Email Verification"),
 
     path("user/add/educational_details/", views.UserAddEducationalDetails, name="Add educational details"),
@@ -22,6 +21,16 @@ urlpatterns = [
          name="Edit Work Details Separate"),
     path("user/delete/work_details/<str:work_id>/", views.deleteWorkDetails,
          name="Delete Work Details Separate"),
+
+    # path("user/add/project_details/", views.UserAddProjectExperience, name="Add work experience"),
+    # path("user/get/project_details/", views.GetProjectDetails, name="Get Work Details"),
+    # path("user/update/project_details/<str:work_id>/", views.editProjectDetailsSeparate,
+    #      name="Edit Work Details Separate"),
+    # path("user/delete/project_details/<str:work_id>/", views.deleteProjectDetails,
+    #      name="Delete Work Details Separate"),
+    #
+    #
+
 
     path("get/degrees/", views.get_degree_types, name="Get Degrees"),
 
