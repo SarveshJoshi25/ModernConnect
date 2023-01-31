@@ -48,7 +48,7 @@ Users can be of two types, either a Student or an Alumni.     \
 | `otp`      | `string` | OTP sent on email address. |
 
 ****
-#### Log-in the User
+#### Login the User
 
 ```http
   POST /api/v1/user/login/
