@@ -61,7 +61,8 @@ class WorkExperience(models.Model):
     work_organization = models.CharField(max_length=120, null=False, editable=True,
                                          error_messages={"null": "Work Organization can't be null."})
     first_day_at_work = models.DateField()
-    is_current_employer = models.BooleanField(editable=True)
+    is_current_employer = models.BooleanField(editable=True, error_messages={"error": "Current Employee value can "
+                                                                                      "only be Yes or No. "})
     last_day_at_work = models.DateField(null=True)
     work_description = models.CharField(max_length=1200, null=True, editable=True)
     user_id = models.CharField(editable=False, max_length=60)

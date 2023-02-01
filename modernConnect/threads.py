@@ -2,10 +2,13 @@ import threading
 import random
 from utils import db
 import datetime
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMessage
 from django.http import JsonResponse
 from rest_framework import status
+from django.utils.html import strip_tags
+from django.template.loader import render_to_string, get_template
 import bcrypt
+from django.template import Context
 
 
 def encrypt_password(password: str) -> str:
@@ -33,13 +36,23 @@ class sendVerificationEmail(threading.Thread):
                     "timestamp": datetime.datetime.now()
                 }
             )
-            send_mail('Verification for ModernConnect.', """Hello {0}, 
-            \nThis Email is to inform you about registration of this email address on ModernConnect. 
-            \nIgnore this message if you've not initiated this process. \nIf you've initiated this process, 
-            Please consider {1} as your One Time Password to verify this account! """.format(
-                self.user['full_name'], otp),
-                      'sjfrommodernconnect@gmail.com', [self.user['email_address']], fail_silently=False)
+            message = get_template("mail-template.html").render({
+                "user_name": self.user['full_name'],
+                "otp": otp
+            })
+
+            mail = EmailMessage(
+                subject="Verification for ModernConnect.",
+                body=message,
+                from_email="sjfrommodernconnect@gmail.com",
+                to=[self.user['email_address']],
+                reply_to=["sjfrommodernconnect@gmail.com"],
+            )
+            mail.content_subtype = "html"
+            mail.send()
             print("Email sent successfully. at {0}".format(datetime.datetime.now()))
         except Exception as e:
             return JsonResponse({"error": "An error has occurred during sending verification email. "},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
