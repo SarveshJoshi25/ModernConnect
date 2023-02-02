@@ -65,6 +65,7 @@ class WorkExperience(models.Model):
                                                                                       "only be Yes or No. "})
     last_day_at_work = models.DateField(null=True)
     work_description = models.CharField(max_length=1200, null=True, editable=True)
+    work_experience = models.CharField(max_length=120, null=True, editable=False)
     user_id = models.CharField(editable=False, max_length=60)
 
 

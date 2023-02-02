@@ -10,7 +10,8 @@ from .exceptions import InvalidUsernameLength, InvalidUsernameInvalidLetters, In
     InvalidUsernameAlreadyExists, InvalidGender, InvalidAccountType, InvalidEmailHost, InvalidFullName, \
     InvalidEmailAlreadyExists, InvalidLengthPassword, InvalidUserContactLengthNot10, InvalidUserContactNotDigit, \
     InvalidInstituteName, InvalidLocation, InvalidEnrollmentYear, InvalidCompletion, InvalidEnrollmentCompletionPair, \
-    InvalidDegree, InvalidStream, InvalidDesignation, InvalidOrganization, InvalidFirstDayAtWork, InvalidLastDayAtWork, InvalidCurrentEmployer
+    InvalidDegree, InvalidStream, InvalidDesignation, InvalidOrganization, InvalidFirstDayAtWork, InvalidLastDayAtWork, \
+    InvalidCurrentEmployer
 import string
 import bcrypt
 from utils import db
@@ -167,22 +168,44 @@ def verify_education(list_of_education, user_id):
 
 
 def verify_work(list_of_work, user_id):
+    list_of_verified_work = []
     for each_work_experience in list_of_work:
+        work = WorkExperience()
         if len(each_work_experience["work_designation"]) <= 0:
             raise InvalidDesignation
+        work.work_designation = each_work_experience["work_designation"]
+
         if len(each_work_experience["work_organization"]) <= 0:
             raise InvalidOrganization
-        if not each_work_experience["is_current_employer"] == "False" or each_work_experience["is_current_employer"] == "True":
+        work.work_organization = each_work_experience["work_organization"]
+
+        if not (str(each_work_experience["is_current_employer"]).title() == 'False' or
+                str(each_work_experience["is_current_employer"]).title() == 'True'):
             raise InvalidCurrentEmployer
-        each_work_experience["first_day_at_work"] = datetime.datetime.strptime(each_work_experience["first_day_at_work"], "%Y-%m-%d").date()
+        work.is_current_employer = each_work_experience["is_current_employer"]
+
+        each_work_experience["first_day_at_work"] = datetime.datetime.strptime(
+            each_work_experience["first_day_at_work"], "%Y-%m-%d").date()
+
         if each_work_experience["first_day_at_work"] > datetime.date.today():
             raise InvalidFirstDayAtWork
+        work.first_day_at_work = each_work_experience["first_day_at_work"]
+
         if each_work_experience["is_current_employer"] == "False":
-            each_work_experience["last_day_at_work"] = datetime.datetime.strptime(each_work_experience["last_day_at_work"], "%Y-%m-%d").date()
+            each_work_experience["last_day_at_work"] = datetime.datetime.strptime(
+                each_work_experience["last_day_at_work"], "%Y-%m-%d").date()
+
             if each_work_experience["first_day_at_work"] > each_work_experience["last_day_at_work"]:
                 raise InvalidLastDayAtWork
-        each_work_experience["user_id"] = user_id
-    return list_of_work
+            work.last_day_at_work = each_work_experience["last_day_at_work"]
+            work_experience = (work.last_day_at_work.year - work.first_day_at_work.year) * 12 + \
+                              work.last_day_at_work.month - work.first_day_at_work.month
+            work.work_experience = "{0} Years, {1} Months".format(int(work_experience / 12), work_experience % 12)
+        work.user_id = user_id
+        work.work_description = each_work_experience["work_description"]
+        work.work_experience_id = str(uuid.uuid4())
+        list_of_verified_work.append(work)
+    return list_of_verified_work
 
 
 # View calls below.
@@ -523,7 +546,8 @@ def getEducationalDetails(request):
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
-        educational_details = EducationalExperience.objects.filter(user_id=decoded_token['user_id']).order_by("enrollment_year").values()
+        educational_details = EducationalExperience.objects.filter(user_id=decoded_token['user_id']).order_by(
+            "enrollment_year").values()
         educational_details = list(educational_details)
         return JsonResponse({"educational_details": educational_details}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
@@ -538,7 +562,8 @@ def editEducationalDetailsSeparate(request, education_id):
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
-        fetched_details = EducationalExperience.objects.filter(user_id=decoded_token['user_id'], education_id=education_id)
+        fetched_details = EducationalExperience.objects.filter(user_id=decoded_token['user_id'],
+                                                               education_id=education_id)
         if fetched_details.count() == 0:
             return JsonResponse({"error": "Invalid Educational ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
         received_data = request.data
@@ -575,7 +600,8 @@ def deleteEducationalDetailsSeparate(request, education_id):
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
-        deleted_ = EducationalExperience.objects.filter(user_id=decoded_token['user_id'], education_id=education_id).delete()
+        deleted_ = EducationalExperience.objects.filter(user_id=decoded_token['user_id'],
+                                                        education_id=education_id).delete()
         if deleted_[0] == 0:
             return JsonResponse({"error": "Requested Educational Experience not found."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -612,17 +638,9 @@ def UserAddWorkExperience(request):
         received_data = request.data
         list_of_work = list(received_data.get("work_data"))
         decoded_token = decode_jwt_token(received_token)
-        list_of_work = verify_work(list_of_work, decoded_token["user_id"])
-        for verified_work in list_of_work:
-            work = WorkExperience(work_designation=verified_work["work_designation"],
-                                  work_organization=verified_work["work_organization"],
-                                  first_day_at_work=verified_work["first_day_at_work"],
-                                  is_current_employer=verified_work["is_current_employer"],
-                                  last_day_at_work=verified_work["last_day_at_work"],
-                                  work_description=verified_work["work_description"],
-                                  user_id=decoded_token["user_id"],
-                                  work_experience_id=uuid.uuid4())
-            work.save()
+        list_of_verified_work = verify_work(list_of_work, decoded_token["user_id"])
+        for verified_work in list_of_verified_work:
+            verified_work.save()
         return JsonResponse({"success": "Work Experience added successfully."}, status=status.HTTP_200_OK)
     except ValidationError as v:
         print(v.message)
@@ -649,7 +667,8 @@ def UserAddWorkExperience(request):
     except AttributeError:
         return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except InvalidCurrentEmployer:
-        return JsonResponse({"error": "Current Employee value can only be True or False."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"error": "Current Employee value can only be True or False."},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["GET"])
@@ -659,6 +678,11 @@ def GetWorkDetails(request):
     decoded_token = decode_jwt_token(received_token)
     work_details = WorkExperience.objects.filter(user_id=decoded_token['user_id']).order_by(
         'first_day_at_work').values()
+    for each in work_details:
+        if each['is_current_employer']:
+            work_experience = (datetime.datetime.today().year - each['first_day_at_work'].year) * 12 + \
+                              datetime.datetime.today().month - each['first_day_at_work'].month
+            each['work_experience'] = "{0} Years, {1} Months".format(int(work_experience / 12), work_experience % 12)
     return JsonResponse({"work_details": list(work_details)}, status=status.HTTP_200_OK)
 
 
@@ -675,14 +699,8 @@ def editWorkDetailsSeparate(request, work_id):
         work_list = [received_data]
         work_list = verify_work(work_list, decoded_token["user_id"])
         WorkExperience.objects.filter(user_id=decoded_token['user_id'], work_experience_id=work_id).delete()
-        work = WorkExperience(work_designation=work_list[0]["work_designation"],
-                              work_organization=work_list[0]["work_organization"],
-                              first_day_at_work=work_list[0]["first_day_at_work"],
-                              is_current_employer=work_list[0]["is_current_employer"],
-                              last_day_at_work=work_list[0]["last_day_at_work"],
-                              work_description=work_list[0]["work_description"],
-                              user_id=decoded_token["user_id"],
-                              work_experience_id=work_id)
+        work = work_list[0]
+        work.work_experience_id = work_id
         work.save()
         return JsonResponse({"success": "Work Experience is updated!"}, status=status.HTTP_200_OK)
     except ValidationError as v:
@@ -710,7 +728,8 @@ def editWorkDetailsSeparate(request, work_id):
     except AttributeError:
         return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except InvalidCurrentEmployer:
-        return JsonResponse({"error": "Current Employee value can only be True or False."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"error": "Current Employee value can only be True or False."},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["DELETE"])
