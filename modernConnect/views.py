@@ -18,7 +18,7 @@ from utils import db
 from email_validator import validate_email, EmailNotValidError
 from .models import UserAccount, WorkExperience, EducationalExperience
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
 from config import jwt_secret
 from rest_framework.authtoken.models import Token
@@ -208,6 +208,15 @@ def verify_work(list_of_work, user_id):
     return list_of_verified_work
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def IsAwake(request):
+    """
+        Checks if Server is Awake, sends a 200 response every time.
+    """
+    return JsonResponse({"message": "The server is awake!"}, status=status.HTTP_200_OK)
+
+
 # View calls below.
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -231,7 +240,7 @@ def UserSignup(request):
             "about_yourself": "Backend Developer"
         }
 
-        :returns Success message, and an OTP is sent on Email for verification.
+        returns Success message, and an OTP is sent on Email for verification.
 
     2. Request body for Student =
         Request body:
@@ -293,8 +302,6 @@ def UserSignup(request):
                                                                           user_object['account_type']))
         jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
         return jsonResponse
-
-
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except InvalidUsernameLength:
@@ -454,8 +461,6 @@ def UserLogin(request):
         else:
             return JsonResponse({"response": "Username and Password didn't match."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
-
-
     except KeyError:
         return JsonResponse({"error": "Required fields not found."}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
@@ -626,7 +631,7 @@ def UserAddWorkExperience(request):
                 "last_day_at_work": "01-11-2022",
                 "is_current_employer": "No",
                 "work_description": "Developed features for the company's Financial Reconciliation Software. The
-                day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgreSQL
+                day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgresSQL
                 databases and sending responses to the front-end using JSON and collaborating with Front-end developers
                 to develop full-stack features."
             }
