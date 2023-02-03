@@ -6,12 +6,6 @@ from .threads import sendVerificationEmail
 from django.http import JsonResponse
 from rest_framework import status
 import uuid
-from .exceptions import InvalidUsernameLength, InvalidUsernameInvalidLetters, InvalidUsernameUnderscore, \
-    InvalidUsernameAlreadyExists, InvalidGender, InvalidAccountType, InvalidEmailHost, InvalidFullName, \
-    InvalidEmailAlreadyExists, InvalidLengthPassword, InvalidUserContactLengthNot10, InvalidUserContactNotDigit, \
-    InvalidInstituteName, InvalidLocation, InvalidEnrollmentYear, InvalidCompletion, InvalidEnrollmentCompletionPair, \
-    InvalidDegree, InvalidStream, InvalidDesignation, InvalidOrganization, InvalidFirstDayAtWork, InvalidLastDayAtWork, \
-    InvalidCurrentEmployer
 import string
 import bcrypt
 from utils import db
@@ -32,21 +26,21 @@ def encrypt_password(password: str) -> str:
 
 def validate_user_password(password: str):
     if len(password) < 5:
-        raise InvalidLengthPassword
+        raise Exception("error: Password Length must be more than 5.")
     return True
 
 
 def validate_user_contact_number(contact_number: str):
     if not contact_number.isdigit():
-        raise InvalidUserContactNotDigit
+        raise Exception("error: Invalid Phone number.")
     if not len(contact_number) == 10:
-        raise InvalidUserContactLengthNot10
+        raise Exception("error: Phone Number must be of length 10.")
 
 
 def validate_user_full_name(user_full_name: str):
     for y in [x.isalpha() is True for x in user_full_name.split(' ')]:
         if y is False:
-            raise InvalidFullName
+            raise Exception("error: Invalid Name of User.")
 
 
 def validate_user(user_object):
@@ -54,27 +48,16 @@ def validate_user(user_object):
         validate_user_name(user_name=user_object['user_name'])
         validate_user_full_name(user_full_name=user_object['full_name'])
         if not (user_object['gender'] == 'M' or user_object['gender'] == 'F' or user_object['gender'] == 'O'):
-            raise InvalidGender
+            raise Exception("error: User's Gender must be either M, F or O.")
 
         if not (user_object['account_type'] == 'Student' or user_object['account_type'] == 'Alumni' or
                 user_object['account_type'] == 'Admin'):
-            raise InvalidAccountType
+            raise Exception("error: Account Type must be either Student, Alumni or Admin.")
         validate_user_email(user_object)
         validate_user_password(user_object['password'])
         validate_user_contact_number(user_object['contact_number'])
-
-    except InvalidUsernameLength:
-        raise InvalidUsernameLength
-    except InvalidUsernameInvalidLetters:
-        raise InvalidUsernameInvalidLetters
-    except InvalidUsernameUnderscore:
-        raise InvalidUsernameUnderscore
-    except InvalidGender:
-        raise InvalidGender
-    except InvalidAccountType:
-        raise InvalidAccountType
-    except InvalidEmailAlreadyExists:
-        raise InvalidEmailAlreadyExists
+    except Exception as e:
+        raise e
 
 
 def send_verification_email(user):
@@ -84,27 +67,27 @@ def send_verification_email(user):
 def validate_user_name(user_name: str):
     match = string.ascii_letters + string.digits + '_'
     if not 20 >= len(user_name.lower()) >= 5:
-        raise InvalidUsernameLength
+        raise Exception("error: Username's Length must be more than or equal to 5 and less than or equal to 20.")
     if not all([x in match for x in user_name]):
-        raise InvalidUsernameInvalidLetters
+        raise Exception("error: Invalid Username (can only contain letters, digits and underscores)")
     if user_name.lower()[0] == '_' or user_name.lower()[-1] == '_':
-        raise InvalidUsernameUnderscore
+        raise Exception("error: Invalid Username (Underscores can't exist at front or rear ends of username) ")
     collection_name = db["user_accounts"]
-    if len(list(collection_name.find({'user_name': user_name}))):
-        raise InvalidUsernameAlreadyExists
+    if len(list(collection_name.find({'user_name': user_name, "user_if_email_verified": True}))):
+        raise Exception("error: Invalid Username (Username already registered) ")
     return True
 
 
 def validate_user_email(user):
     if not validate_email(user['email_address'], check_deliverability=True, globally_deliverable=True):
-        raise EmailNotValidError
+        raise Exception("error: Invalid Email Address")
     if user['account_type'] == 'Student':
         email, domain = str(user['email_address']).split('@')
         if domain != "moderncoe.edu.in":
-            raise InvalidEmailHost
+            raise Exception("error: Invalid Email (Students need to use Email Address provided by College.)")
     collection_name = db["user_accounts"]
     if len(list(collection_name.find({'user_email': str(user['email_address']), "user_if_email_verified": True}))):
-        raise InvalidEmailAlreadyExists
+        raise Exception("error: Invalid Email Address (Email Address already registered) ")
     return True
 
 
@@ -134,25 +117,26 @@ def verify_education(list_of_education, user_id):
     verified_education = []
     for education in list_of_education:
         if len(str(education.get("institute")).strip()) == 0:
-            raise InvalidInstituteName
+            raise Exception("error: Invalid Institute (Institute Name can't be None.) ")
 
         if len(str(education.get("location")).strip()) == 0:
-            raise InvalidLocation
+            raise Exception("error: Invalid Location (Location can't be None.) ")
 
         if not (str(education.get("enrollment_year")).strip()).isdigit():
-            raise InvalidEnrollmentYear
+            raise Exception("error: Invalid Enrollment Year (Enrollment Year should only contain digits.) ")
 
         if not (str(education.get("completion_year")).strip()).isdigit():
-            raise InvalidCompletion
+            raise Exception("error: Invalid Completion Year (Completion Year should only contain digits.) ")
 
         if int(education.get("enrollment_year")) > int(education.get("completion_year")):
-            raise InvalidEnrollmentCompletionPair
+            raise Exception("error: Invalid Completion Year and Enrollment Year Pair.")
 
         if not verify_degree(int(education.get("degree"))):
-            raise InvalidDegree
+            raise Exception("error: Invalid Degree.")
 
         if len(str(education.get("stream")).strip()) == 0:
-            raise InvalidStream
+            raise Exception("error: Invalid Stream (Stream can't be None.)")
+
         verified_education.append(EducationalExperience(
             institute=str(education.get("institute")).strip(),
             location=str(education.get("location")).strip(),
@@ -172,23 +156,23 @@ def verify_work(list_of_work, user_id):
     for each_work_experience in list_of_work:
         work = WorkExperience()
         if len(each_work_experience["work_designation"]) <= 0:
-            raise InvalidDesignation
+            raise Exception("error: Invalid Completion Year and Enrollment Year Pair.")
         work.work_designation = each_work_experience["work_designation"]
 
         if len(each_work_experience["work_organization"]) <= 0:
-            raise InvalidOrganization
+            raise Exception("error: Invalid Work Organization.")
         work.work_organization = each_work_experience["work_organization"]
 
         if not (str(each_work_experience["is_current_employer"]).title() == 'False' or
                 str(each_work_experience["is_current_employer"]).title() == 'True'):
-            raise InvalidCurrentEmployer
+            raise Exception("error: Invalid Current Employer (should be either True or False) ")
         work.is_current_employer = each_work_experience["is_current_employer"]
 
         each_work_experience["first_day_at_work"] = datetime.datetime.strptime(
             each_work_experience["first_day_at_work"], "%Y-%m-%d").date()
 
         if each_work_experience["first_day_at_work"] > datetime.date.today():
-            raise InvalidFirstDayAtWork
+            raise Exception("error: Invalid First Day at work (Future dates are not allowed)")
         work.first_day_at_work = each_work_experience["first_day_at_work"]
 
         if each_work_experience["is_current_employer"] == "False":
@@ -196,7 +180,7 @@ def verify_work(list_of_work, user_id):
                 each_work_experience["last_day_at_work"], "%Y-%m-%d").date()
 
             if each_work_experience["first_day_at_work"] > each_work_experience["last_day_at_work"]:
-                raise InvalidLastDayAtWork
+                raise Exception("error: Invalid First Day at Work and First Day at Work Pair.")
             work.last_day_at_work = each_work_experience["last_day_at_work"]
             work_experience = (work.last_day_at_work.year - work.first_day_at_work.year) * 12 + \
                               work.last_day_at_work.month - work.first_day_at_work.month
@@ -304,59 +288,24 @@ def UserSignup(request):
         return jsonResponse
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidUsernameLength:
-        return JsonResponse({"error": "The length of username should be between 5 to 20"},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidUsernameInvalidLetters:
-        return JsonResponse({"error": "Username can only contain alphanumeric and underscores."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-
-    except InvalidUsernameUnderscore:
-        return JsonResponse({"error": "Username can't start or end with underscore."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-
-    except InvalidUsernameAlreadyExists:
-        return JsonResponse({"error": "Username already taken by someone else."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-
-    except InvalidGender:
-        return JsonResponse({"error": "Gender can be either M/F or O."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-
-    except InvalidEmailAlreadyExists:
-        return JsonResponse({"error": "Email already registered with someone else."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-
-    except InvalidAccountType:
-        return JsonResponse({"error": "The account type can be only Student or Alumni."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-
-    except InvalidEmailHost:
-        return JsonResponse({"error": "Please use your college email address for registration, "
-                                      "and not the private email address."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidFullName:
-        return JsonResponse({"error": "The full name length is invalid."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidLengthPassword:
-        return JsonResponse({"error": "The Password length is Invalid."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidUserContactNotDigit:
-        return JsonResponse({"error": "Invalid Contact number."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidUserContactLengthNot10:
-        return JsonResponse({"error": "Invalid Contact number."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def userLogout(request):
-    """
-    requirements: JWT Token in Cookies, and Authorization header.
-    :param request: None.
-    :return: Status code 200.
-    """
-    db["authtoken_token"].delete_one(filter={"user_id": decode_jwt_token(request.COOKIES.get("JWT_TOKEN"))["user_id"]})
-    return JsonResponse({"success": "Logged Out."})
+    try:
+        """
+        requirements: JWT Token in Cookies, and Authorization header.
+        :param request: None.
+        :return: Status code 200.
+        """
+        db["authtoken_token"].delete_one(
+            filter={"user_id": decode_jwt_token(request.COOKIES.get("JWT_TOKEN"))["user_id"]})
+        return JsonResponse({"success": "Logged Out."})
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 # delete the header authentication from front-end.
@@ -408,9 +357,12 @@ def verifyEmailAddress(request):
 
         return JsonResponse({"response": "Your Email has been verified. Now you can access all features for the Users"},
                             status=status.HTTP_200_OK)
-
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["POST"])
@@ -467,6 +419,8 @@ def UserLogin(request):
     except UserAccount.DoesNotExist:
         return JsonResponse({"error": "The Account with given Username doesn't exists."},
                             status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["GET"])
@@ -522,23 +476,11 @@ def UserAddEducationalDetails(request):
         return JsonResponse({"success": "Education added successfully."}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidInstituteName:
-        return JsonResponse({"error", "Invalid Institute Name."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidLocation:
-        return JsonResponse({"error", "Invalid Location."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidEnrollmentYear:
-        return JsonResponse({"error": "Invalid Enrollment Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidCompletion:
-        return JsonResponse({"error": "Invalid Completion Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidEnrollmentCompletionPair:
-        return JsonResponse({"error": "Enrollment Year can't be greater than Completion Year."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidDegree:
-        return JsonResponse({"error": "Invalid Degree ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidStream:
-        return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
 
 
 @api_view(["GET"])
@@ -559,6 +501,8 @@ def getEducationalDetails(request):
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["POST"])
@@ -582,21 +526,8 @@ def editEducationalDetailsSeparate(request, education_id):
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidInstituteName:
-        return JsonResponse({"error", "Invalid Institute Name."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidLocation:
-        return JsonResponse({"error", "Invalid Location."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidEnrollmentYear:
-        return JsonResponse({"error": "Invalid Enrollment Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidCompletion:
-        return JsonResponse({"error": "Invalid Completion Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidEnrollmentCompletionPair:
-        return JsonResponse({"error": "Enrollment Year can't be greater than Completion Year."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidDegree:
-        return JsonResponse({"error": "Invalid Degree ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidStream:
-        return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["DELETE"])
@@ -615,6 +546,8 @@ def deleteEducationalDetailsSeparate(request, education_id):
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["POST"])
@@ -652,43 +585,32 @@ def UserAddWorkExperience(request):
         return JsonResponse({"error": v.message}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidInstituteName:
-        return JsonResponse({"error", "Invalid Institute Name."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidLocation:
-        return JsonResponse({"error", "Invalid Location."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidEnrollmentYear:
-        return JsonResponse({"error": "Invalid Enrollment Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidCompletion:
-        return JsonResponse({"error": "Invalid Completion Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidEnrollmentCompletionPair:
-        return JsonResponse({"error": "Enrollment Year can't be greater than Completion Year."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidDegree:
-        return JsonResponse({"error": "Invalid Degree ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidStream:
-        return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except KeyError:
-        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except AttributeError:
         return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidCurrentEmployer:
-        return JsonResponse({"error": "Current Employee value can only be True or False."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def GetWorkDetails(request):
-    received_token = request.COOKIES.get("JWT_TOKEN")
-    decoded_token = decode_jwt_token(received_token)
-    work_details = WorkExperience.objects.filter(user_id=decoded_token['user_id']).order_by(
-        'first_day_at_work').values()
-    for each in work_details:
-        if each['is_current_employer']:
-            work_experience = (datetime.datetime.today().year - each['first_day_at_work'].year) * 12 + \
-                              datetime.datetime.today().month - each['first_day_at_work'].month
-            each['work_experience'] = "{0} Years, {1} Months".format(int(work_experience / 12), work_experience % 12)
-    return JsonResponse({"work_details": list(work_details)}, status=status.HTTP_200_OK)
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        work_details = WorkExperience.objects.filter(user_id=decoded_token['user_id']).order_by(
+            'first_day_at_work').values()
+        for each in work_details:
+            if each['is_current_employer']:
+                work_experience = (datetime.datetime.today().year - each['first_day_at_work'].year) * 12 + \
+                                  datetime.datetime.today().month - each['first_day_at_work'].month
+                each['work_experience'] = "{0} Years, {1} Months".format(int(work_experience / 12),
+                                                                         work_experience % 12)
+        return JsonResponse({"work_details": list(work_details)}, status=status.HTTP_200_OK)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["POST"])
@@ -713,28 +635,12 @@ def editWorkDetailsSeparate(request, work_id):
         return JsonResponse({"error": v.message}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidInstituteName:
-        return JsonResponse({"error", "Invalid Institute Name."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidLocation:
-        return JsonResponse({"error", "Invalid Location."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidEnrollmentYear:
-        return JsonResponse({"error": "Invalid Enrollment Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidCompletion:
-        return JsonResponse({"error": "Invalid Completion Year"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidEnrollmentCompletionPair:
-        return JsonResponse({"error": "Enrollment Year can't be greater than Completion Year."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidDegree:
-        return JsonResponse({"error": "Invalid Degree ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidStream:
-        return JsonResponse({"error": "Invalid Stream"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except AttributeError:
         return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-    except InvalidCurrentEmployer:
-        return JsonResponse({"error": "Current Employee value can only be True or False."},
-                            status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["DELETE"])
@@ -752,3 +658,5 @@ def deleteWorkDetails(request, work_id):
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
