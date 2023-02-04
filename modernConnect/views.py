@@ -482,7 +482,6 @@ def UserAddEducationalDetails(request):
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def getEducationalDetails(request):
@@ -508,6 +507,24 @@ def getEducationalDetails(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def editEducationalDetailsSeparate(request, education_id):
+    """
+    :requirements: The User must be logged in.
+    :param: send educational id as a parameter.
+
+    Sample Input:
+        {
+            "institute": "Modern College of Engineering, Pune",
+            "location": "Pune, Maharashtra",
+            "enrollment_year": "2021",
+            "completion_year": "2024",
+            "degree": "2",
+            "stream": "Information Technology",
+            "grade": "8.7"
+        }
+
+    :return: Status 200 on success, or Status 406 on errors.
+
+    """
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
@@ -533,6 +550,14 @@ def editEducationalDetailsSeparate(request, education_id):
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def deleteEducationalDetailsSeparate(request, education_id):
+    """
+    :requirements: User must be logged in, Send educational ID as parameters.
+
+    :param request:
+    :param education_id:
+
+    :return:
+    """
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
@@ -554,22 +579,28 @@ def deleteEducationalDetailsSeparate(request, education_id):
 @permission_classes([IsAuthenticated])
 def UserAddWorkExperience(request):
     """
-    {
-        "work_data":
-        [
-            {
-                "work_designation": "Backend Developer Intern",
-                "work_organization": "Rhythmflows Solutions Pvt. Ltd.",
-                "first_day_at_work": "01-08-2022",
-                "last_day_at_work": "01-11-2022",
-                "is_current_employer": "No",
-                "work_description": "Developed features for the company's Financial Reconciliation Software. The
-                day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgresSQL
-                databases and sending responses to the front-end using JSON and collaborating with Front-end developers
-                to develop full-stack features."
-            }
-        ]
-    }
+    :requirements: User must be logged in
+
+    Sample Input:
+        {
+            "work_data":
+            [
+                {
+                    "work_designation": "Backend Developer Intern",
+                    "work_organization": "Rhythmflows Solutions Pvt. Ltd.",
+                    "first_day_at_work": "01-08-2022",
+                    "last_day_at_work": "01-11-2022",
+                    "is_current_employer": "No",
+                    "work_description": "Developed features for the company's Financial Reconciliation Software. The
+                    day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgresSQL
+                    databases and sending responses to the front-end using JSON and collaborating with Front-end developers
+                    to develop full-stack features."
+                }
+            ]
+        }
+
+    :returns: A Status 200 on Success, and 406 on errors.
+
     """
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
@@ -592,9 +623,16 @@ def UserAddWorkExperience(request):
     except Exception as e:
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def GetWorkDetails(request):
+    """
+    :requirements: User must be logged in.
+    :param request:
+    :return: A Status 200 on Success, and 406 on errors.
+    """
+
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
@@ -616,6 +654,26 @@ def GetWorkDetails(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def editWorkDetailsSeparate(request, work_id):
+    """
+    :requirements: User must be logged in, send work_id as a parameter.
+
+    Sample Input :
+    {
+        "work_designation": "Backend Developer Intern",
+        "work_organization": "Rhythmflows Solutions Pvt. Ltd.",
+        "first_day_at_work": "01-08-2022",
+        "last_day_at_work": "01-11-2022",
+        "is_current_employer": "No",
+        "work_description": "Developed features for the company's Financial Reconciliation Software. The
+        day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgresSQL
+        databases and sending responses to the front-end using JSON and collaborating with Front-end developers
+        to develop full-stack features."
+    }
+
+    :param request:
+    :param work_id:
+    :return: A 200 Status code, 406 for errors.
+    """
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
@@ -646,6 +704,12 @@ def editWorkDetailsSeparate(request, work_id):
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def deleteWorkDetails(request, work_id):
+    """
+        :requirements: User must be logged in, send work_id in parameters.
+        :param work_id:
+        :param request:
+        :return: A Status 200 on Success, and 406 on errors.
+    """
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
         decoded_token = decode_jwt_token(received_token)
