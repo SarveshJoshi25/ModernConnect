@@ -12,7 +12,9 @@ The Research Paper for this project is published in UIJRT Volume 3, Issue 6. [Re
 This GitHub repository includes code for ModernConnect's API.
 
 
-## API Reference
+# API Reference
+
+## General User-related URLs.
 
 #### Register User 
 
@@ -62,6 +64,47 @@ Users can be of two types, either a Student or an Alumni.     \
 **Steps to follow after successful log-in of account :**   
     The response consists two cookies - JWT_TOKEN and AUTHENTICATION_TOKEN. Keep JWT_TOKEN as it is, read AUTHENTICATION_TOKEN and set Authorization token as "Token + (value of token)".
 ****
+
+#### Logout the User
+
+```http
+  GET /api/v1/user/logout/
+```
+**No parameters required.**
+****
+
+#### Get Degrees 
+This URL needs to be called during adding educational details of the users. 
+Call to this __doesn't__ need user to be logged-in.
+
+```http
+  GET /api/v1/user/get/degrees/
+```
+**No Parameters required.**
+
+### Sample Output : 
+```
+{
+  "degrees": [
+    {
+      "degree": "Associate Degree",
+      "degree_id": 1
+    },
+    {
+      "degree": "Bachelor Degree",
+      "degree_id": 2
+    },
+    {
+      "degree": "Diploma",
+      "degree_id": 3
+    }
+}
+```
+
+
+
+****
+
 
 ## Authors
 
