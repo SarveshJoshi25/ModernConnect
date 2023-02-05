@@ -101,10 +101,53 @@ Call to this __doesn't__ need user to be logged-in.
 }
 ```
 
-
-
+****
+## Educational Details
 ****
 
+#### Insert educational details 
+
+```http
+  POST user/add/educational_details/
+```
+Users are required to be Logged-in.   \
+ **All parameters are required.**
+| Parameter | Type     | Description                |
+| :-------- | :------- | :------------------------- |
+| `institute` | `string` | example: "Modern College of Engineering" |
+| `location` | `string` | example: "Pune" |
+| `enrollment_year` | `integer` |example: 2021 |
+| `completion_year` | `integer` | example: 2024 |
+| `degree` | `integer` | example: Degree ID from get/degrees/ |
+| `stream` | `string` | example: "Information Technology" |
+| `grade` | `string` | example: Any string, Any Number (NOT REQUIRED)| 
+
+Sample Input: 
+  ```
+ {
+	"educational_data": [
+	{
+		"institute": "Modern College of Engineering, Pune",
+		"location": "Pune, Maharashtra",
+		"enrollment_year": "2021",
+		"completion_year": "2024",
+		"degree": "2",
+		"stream": "Information Technology",
+		"grade": "8.7"
+	},
+	{
+		"institute": "Government Polytechnic, Pune",
+		"location": "Pune, Maharashtra",
+		"enrollment_year": "2018",
+		"completion_year": "2021",
+		"degree": "3",
+		"stream": "Computer Engineering",
+		"grade": "93.8"
+	}]
+}
+  ```
+Output: A 200 response on OK, and 406 on error.
+****
 
 ## Authors
 
