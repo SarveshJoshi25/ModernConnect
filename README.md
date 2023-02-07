@@ -12,7 +12,9 @@ The Research Paper for this project is published in UIJRT Volume 3, Issue 6. [Re
 This GitHub repository includes code for ModernConnect's API.
 
 
-## API Reference
+# API Reference
+
+## General User-related URLs.
 
 #### Register User 
 
@@ -61,6 +63,90 @@ Users can be of two types, either a Student or an Alumni.     \
 
 **Steps to follow after successful log-in of account :**   
     The response consists two cookies - JWT_TOKEN and AUTHENTICATION_TOKEN. Keep JWT_TOKEN as it is, read AUTHENTICATION_TOKEN and set Authorization token as "Token + (value of token)".
+****
+
+#### Logout the User
+
+```http
+  GET /api/v1/user/logout/
+```
+**No parameters required.**
+****
+
+#### Get Degrees 
+This URL needs to be called during adding educational details of the users. 
+Call to this __doesn't__ need user to be logged-in.
+
+```http
+  GET /api/v1/user/get/degrees/
+```
+**No Parameters required.**
+
+### Sample Output : 
+```
+{
+  "degrees": [
+    {
+      "degree": "Associate Degree",
+      "degree_id": 1
+    },
+    {
+      "degree": "Bachelor Degree",
+      "degree_id": 2
+    },
+    {
+      "degree": "Diploma",
+      "degree_id": 3
+    }
+}
+```
+
+****
+## Educational Details
+****
+
+#### Insert educational details 
+
+```http
+  POST user/add/educational_details/
+```
+Users are required to be Logged-in.   \
+ **All parameters are required.**
+| Parameter | Type     | Description                |
+| :-------- | :------- | :------------------------- |
+| `institute` | `string` | example: "Modern College of Engineering" |
+| `location` | `string` | example: "Pune" |
+| `enrollment_year` | `integer` |example: 2021 |
+| `completion_year` | `integer` | example: 2024 |
+| `degree` | `integer` | example: Degree ID from get/degrees/ |
+| `stream` | `string` | example: "Information Technology" |
+| `grade` | `string` | example: Any string, Any Number (NOT REQUIRED)| 
+
+Sample Input: 
+  ```
+ {
+	"educational_data": [
+	{
+		"institute": "Modern College of Engineering, Pune",
+		"location": "Pune, Maharashtra",
+		"enrollment_year": "2021",
+		"completion_year": "2024",
+		"degree": "2",
+		"stream": "Information Technology",
+		"grade": "8.7"
+	},
+	{
+		"institute": "Government Polytechnic, Pune",
+		"location": "Pune, Maharashtra",
+		"enrollment_year": "2018",
+		"completion_year": "2021",
+		"degree": "3",
+		"stream": "Computer Engineering",
+		"grade": "93.8"
+	}]
+}
+  ```
+Output: A 200 response on OK, and 406 on error.
 ****
 
 ## Authors
