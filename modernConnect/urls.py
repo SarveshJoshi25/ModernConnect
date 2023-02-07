@@ -24,12 +24,12 @@ urlpatterns = [
     path("user/delete/work_details/<str:work_id>/", views.deleteWorkDetails,
          name="Delete Work Details Separate"),
 
-    # path("user/add/project_details/", views.UserAddProjectExperience, name="Add work experience"),
-    # path("user/get/project_details/", views.GetProjectDetails, name="Get Work Details"),
-    # path("user/update/project_details/<str:work_id>/", views.editProjectDetailsSeparate,
-    #      name="Edit Work Details Separate"),
-    # path("user/delete/project_details/<str:work_id>/", views.deleteProjectDetails,
-    #      name="Delete Work Details Separate"),
+    path("user/add/project_details/", views.UserAddProjectExperience, name="Add work experience"),
+    path("user/get/project_details/", views.GetProjectDetails, name="Get Work Details"),
+    path("user/update/project_details/<str:project_id>/", views.editProjectDetailsSeparate,
+         name="Edit Work Details Separate"),
+    path("user/delete/project_details/<str:project_id>/", views.deleteProjectDetails,
+         name="Delete Work Details Separate"),
     #
     #
 

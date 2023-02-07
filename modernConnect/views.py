@@ -10,7 +10,8 @@ import string
 import bcrypt
 from utils import db
 from email_validator import validate_email, EmailNotValidError
-from .models import UserAccount, WorkExperience, EducationalExperience
+import validators
+from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
@@ -190,6 +191,34 @@ def verify_work(list_of_work, user_id):
         work.work_experience_id = str(uuid.uuid4())
         list_of_verified_work.append(work)
     return list_of_verified_work
+
+
+def verify_projects(list_of_projects, user_id):
+    list_of_verified_projects = []
+    for each_project in list_of_projects:
+        project = ProjectDetails()
+        if len(each_project["project_title"]) <= 0:
+            raise Exception("error: Invalid Project Title (Project title can't be null).")
+        project.project_title = each_project["project_title"]
+
+        if len(each_project["project_headline"]) <= 0:
+            raise Exception("error: Invalid Project Headline (Project headline can't be null).")
+        project.project_headline = each_project["project_headline"]
+
+        if each_project['project_link']:
+            if not validators.url(str(each_project['project_link'])):
+                raise Exception("error: Invalid Project Link.")
+            project.project_link = each_project['project_link']
+
+        if each_project['project_description']:
+            if len(each_project['project_description']) <= 0:
+                raise Exception("error: Invalid Project Description (Project Description can't be null).")
+            project.project_description = each_project['project_description']
+
+        project.user_id = user_id
+        project.project_id = str(uuid.uuid4())
+        list_of_verified_projects.append(project)
+    return list_of_verified_projects
 
 
 @api_view(["GET"])
@@ -661,9 +690,9 @@ def editWorkDetailsSeparate(request, work_id):
     {
         "work_designation": "Backend Developer Intern",
         "work_organization": "Rhythmflows Solutions Pvt. Ltd.",
-        "first_day_at_work": "01-08-2022",
-        "last_day_at_work": "01-11-2022",
-        "is_current_employer": "No",
+        "first_day_at_work": "2022-08-01",
+        "last_day_at_work": "2022-11-01",
+        "is_current_employer": "False",
         "work_description": "Developed features for the company's Financial Reconciliation Software. The
         day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgresSQL
         databases and sending responses to the front-end using JSON and collaborating with Front-end developers
@@ -718,6 +747,146 @@ def deleteWorkDetails(request, work_id):
             return JsonResponse({"error": "Requested Work Experience not found."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
         return JsonResponse({"success": "Work Experience deleted successfully!"}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def UserAddProjectExperience(request):
+    """
+    :requirements: User must be logged in
+
+    Sample Input:
+        {
+            "projects":
+            [
+                {
+                    "project_title": "ModernConnect",
+                    "project_headline": "An exclusive platform for and from students of Modern College of Engineering",
+                    "project_link": "https://www.github.com/SarveshJoshi25/ModernConnect",
+                    "project_description": "Description!!!!"
+                },
+                {
+                    "project_title": "ModernConnect",
+                    "project_headline": "An exclusive platform for and from students of Modern College of Engineering",
+                    "project_link": "https://www.github.com/SarveshJoshi25/ModernConnect",
+                    "project_description": "Description!!!!"
+                }
+            ]
+        }
+
+    :returns: A Status 200 on Success, and 406 on errors.
+
+    """
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        received_data = request.data
+        list_of_projects = list(received_data.get("projects"))
+        decoded_token = decode_jwt_token(received_token)
+        list_of_verified_projects = verify_projects(list_of_projects, decoded_token["user_id"])
+        for verified_project in list_of_verified_projects:
+            verified_project.save()
+        return JsonResponse({"success": "Projects added successfully."}, status=status.HTTP_200_OK)
+    except ValidationError as v:
+        print(v.message)
+        return JsonResponse({"error": v.message}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except AttributeError:
+        return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def GetProjectDetails(request):
+    """
+    :requirements: User must be logged in.
+    :param request:
+    :return: A Status 200 on Success, and 406 on errors.
+    """
+
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        project_details = ProjectDetails.objects.filter(user_id=decoded_token['user_id']).values()
+        return JsonResponse({"project_details": list(project_details)}, status=status.HTTP_200_OK)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def editProjectDetailsSeparate(request, project_id):
+    """
+    :requirements: User must be logged in, send work_id as a parameter.
+
+    Sample Input :
+    {
+        "project_title": "ModernConnect",
+        "project_headline": "An exclusive platform for and from students of Modern College of Engineering",
+        "project_link": "https://www.github.com/SarveshJoshi25/ModernConnect",
+        "project_description": "Description!!!!"
+    }
+
+    :param request:
+    :param project_id:
+    :return: A 200 Status code, 406 for errors.
+    """
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        fetched_details = ProjectDetails.objects.filter(user_id=decoded_token['user_id'], project_id=project_id)
+        if fetched_details.count() == 0:
+            return JsonResponse({"error": "Invalid Project ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        received_data = request.data
+        project_list = [received_data]
+        project_list = verify_projects(project_list, decoded_token["user_id"])
+        ProjectDetails.objects.filter(user_id=decoded_token['user_id'], project_id=project_id).delete()
+        project = project_list[0]
+        project.project_id = project_id
+        project.save()
+        return JsonResponse({"success": "Project Details is updated!"}, status=status.HTTP_200_OK)
+    except ValidationError as v:
+        print(v.message)
+        return JsonResponse({"error": v.message}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except AttributeError:
+        return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def deleteProjectDetails(request, project_id):
+    """
+        :requirements: User must be logged in, send work_id in parameters.
+        :param project_id:
+        :param request:
+        :return: A Status 200 on Success, and 406 on errors.
+    """
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        deleted_ = ProjectDetails.objects.filter(user_id=decoded_token['user_id'], project_id=project_id).delete()
+        if deleted_[0] == 0:
+            return JsonResponse({"error": "Requested Project Details not found."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"success": "Project Details deleted successfully!"}, status=status.HTTP_200_OK)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:

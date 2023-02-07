@@ -83,3 +83,19 @@ class EducationalExperience(models.Model):
                               error_messages={"null": "Stream can't be null."})
     grade = models.CharField(max_length=20, null=True, editable=True)
     user_id = models.CharField(editable=False, max_length=60)
+
+
+class Skills(models.Model):
+    skill_id = models.IntegerField(primary_key=True, editable=False)
+    skill_name = models.CharField(max_length=120, null=False, editable=True)
+
+
+class ProjectDetails(models.Model):
+    project_id = models.CharField(primary_key=True, default=str(uuid.uuid4()), editable=False, max_length=60)
+    project_title = models.CharField(max_length=60, null=False, editable=True,
+                                     error_messages={'null': "Project title can't be empty."})
+    project_headline = models.CharField(max_length=180, null=False, editable=True,
+                                        error_messages={'null': "Project headline can't be empty."})
+    project_link = models.CharField(max_length=1200, null=True, editable=True)
+    project_description = models.TextField(null=True, editable=True)
+    user_id = models.CharField(editable=False, max_length=60)
