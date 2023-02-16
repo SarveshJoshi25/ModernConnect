@@ -44,6 +44,20 @@ def validate_user_full_name(user_full_name: str):
             raise Exception("error: Invalid Name of User.")
 
 
+def verify_edit_users(user_data):
+    try:
+        validate_user_full_name(user_data["full_name"])
+        if not (user_data['gender'] == 'M' or user_data['gender'] == 'F' or user_data['gender'] == 'O'):
+            raise Exception("error: User's Gender must be either M, F or O.")
+
+        if not (user_data['account_type'] == 'Student' or user_data['account_type'] == 'Alumni' or
+                user_data['account_type'] == 'Admin'):
+            raise Exception("error: Account Type must be either Student, Alumni or Admin.")
+        validate_user_contact_number(user_data['contact_number'])
+    except Exception as e:
+        raise e
+
+
 def validate_user(user_object):
     try:
         validate_user_name(user_name=user_object['user_name'])
@@ -315,6 +329,37 @@ def UserSignup(request):
                                                                           user_object['account_type']))
         jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
         return jsonResponse
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def editUserDetails(request):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        authenticate_this = decode_jwt_token(received_token)
+
+        requesting_user = UserAccount.objects.filter(user_id=authenticate_this['user_id'])
+
+        received_data = request.data
+        verify_edit_users(received_data)
+
+        # "full_name": "Sarvesh Joshi",
+        #     "account_type": "Student",
+        #     "gender": "M",
+        #     "contact_number": "9373496540",
+        #     "about_yourself": "Backend Developer, and developer of this platform."
+
+        requesting_user = requesting_user.update(user_full_name=received_data['full_name'],
+                                                 user_account_type=received_data['account_type'],
+                                                 user_gender=received_data['gender'],
+                                                 user_contact=received_data['contact_number'],
+                                                 user_bio=received_data['about_yourself'])
+
+        return JsonResponse({"message": "Updated data successfully."})
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
