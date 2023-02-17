@@ -35,9 +35,10 @@ urlpatterns = [
          name="Edit Work Details Separate"),
     path("user/delete/project_details/<str:project_id>/", views.deleteProjectDetails,
          name="Delete Work Details Separate"),
-    #
-    #
+
+
+
 
     path("get/degrees/", views.get_degree_types, name="Get Degrees"),
-
+    path("get/context/", views.getContext, name="getContext")
 ]

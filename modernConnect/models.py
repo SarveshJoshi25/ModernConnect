@@ -99,3 +99,8 @@ class ProjectDetails(models.Model):
     project_link = models.CharField(max_length=1200, null=True, editable=True)
     project_description = models.TextField(null=True, editable=True)
     user_id = models.CharField(editable=False, max_length=60)
+
+
+class ContextPost(models.Model):
+    context_id = models.IntegerField(primary_key=True, editable=False)
+    context_name = models.CharField(max_length=120, null=False, editable=True)

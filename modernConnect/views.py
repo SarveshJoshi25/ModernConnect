@@ -11,7 +11,7 @@ import bcrypt
 from utils import db
 from email_validator import validate_email, EmailNotValidError
 import validators
-from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails
+from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails, ContextPost, Skills
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
@@ -380,9 +380,6 @@ def userLogout(request):
         return JsonResponse({"success": "Logged Out."})
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-
-
-# delete the header authentication from front-end.
 
 
 @api_view(["POST"])
@@ -936,5 +933,25 @@ def deleteProjectDetails(request, project_id):
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def getContext(request):
+    try:
+        context_details = ContextPost.objects.all()
+        return JsonResponse({"context_details": list(context_details.values())}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def getSkills(request):
+    try:
+        skills_details = Skills.objects.all()
+        return JsonResponse({"skills": list(skills_details.values())}, status=status.HTTP_200_OK)
     except Exception as e:
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
