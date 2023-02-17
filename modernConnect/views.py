@@ -9,9 +9,10 @@ import uuid
 import string
 import bcrypt
 from utils import db
-from email_validator import validate_email, EmailNotValidError
+from email_validator import validate_email
 import validators
-from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails, ContextPost, Skills
+from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails, ContextPost, Skills, \
+    SocialLinks, ProfileSkills
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
@@ -56,6 +57,24 @@ def verify_edit_users(user_data):
         validate_user_contact_number(user_data['contact_number'])
     except Exception as e:
         raise e
+
+
+def verify_links(links, user_id):
+    list_of_verified_links = []
+    for each_link in links:
+        link = SocialLinks()
+        if len(each_link["social_link_title"]) <= 0:
+            raise Exception("error: Invalid Social Link Title.")
+        link.social_link_title = each_link["social_link_title"]
+
+        if not validators.url(str(each_link['social_link'])):
+            raise Exception("error: Invalid Social Link.")
+        link.social_link = each_link['social_link']
+
+        link.social_link_author = UserAccount.objects.get(user_id=user_id)
+        link.social_link_id = str(uuid.uuid4())
+        list_of_verified_links.append(link)
+    return list_of_verified_links
 
 
 def validate_user(user_object):
@@ -935,6 +954,187 @@ def deleteProjectDetails(request, project_id):
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def UserAddSocialLink(request):
+    """
+    {
+    "social_links":[
+        {
+            "social_link_title": "GitHub",
+            "social_link": "https://www.github.com/SarveshJoshi25/"
+        },
+        {
+            "social_link_title": "Linktree",
+            "social_link": "https://linktr.ee/_sarveshjoshi"
+        }
+        ]
+    }
+    :param request:
+    :return:
+    """
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        received_data = request.data
+        list_of_links = list(received_data.get("social_links"))
+        decoded_token = decode_jwt_token(received_token)
+        list_of_verified_social_links = verify_links(list_of_links, decoded_token["user_id"])
+        for verified_links in list_of_verified_social_links:
+            verified_links.save()
+        return JsonResponse({"success": "Social Links added successfully."}, status=status.HTTP_200_OK)
+    except ValidationError as v:
+        print(v.message)
+        return JsonResponse({"error": v.message}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except AttributeError:
+        return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def GetSocialLink(request):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        link_details = SocialLinks.objects.filter(social_link_author=decoded_token['user_id']).values()
+        return JsonResponse({"social_links": list(link_details)}, status=status.HTTP_200_OK)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def editSocialLink(request, social_link_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        fetched_details = SocialLinks.objects.filter(social_link_author=decoded_token['user_id'],
+                                                     social_link_id=social_link_id)
+        if fetched_details.count() == 0:
+            return JsonResponse({"error": "Invalid Social Link ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        received_data = request.data
+
+        social_link_list = [received_data]
+        social_link_list = verify_links(social_link_list, decoded_token["user_id"])
+
+        update_this = SocialLinks.objects.filter(social_link_author=decoded_token['user_id'],
+                                                 social_link_id=social_link_id)
+        update_this.update(social_link=social_link_list[0].social_link,
+                           social_link_title=social_link_list[0].social_link_title)
+
+        return JsonResponse({"success": "Social Link is updated!"}, status=status.HTTP_200_OK)
+    except ValidationError as v:
+        print(v.message)
+        return JsonResponse({"error": v.message}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except AttributeError:
+        return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def deleteSocialLink(request, social_link_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        deleted_ = SocialLinks.objects.filter(social_link_author=decoded_token['user_id'],
+                                              social_link_id=social_link_id).delete()
+        if deleted_[0] == 0:
+            return JsonResponse({"error": "Requested Social Link Details not found."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"success": "Social Link deleted successfully!"}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def UserAddSkill(request):
+    """
+    {
+    "skills":[
+        {
+            "skill_id": 1,
+
+        },
+        {
+            "skill_id": 5,
+
+        },
+        ]
+    }
+    :param request:
+    :return:
+    """
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        received_data = request.data
+        list_of_skills = list(received_data.get("skills"))
+        decoded_token = decode_jwt_token(received_token)
+        verified_skills = []
+        for each_skill in list_of_skills:
+            skill = ProfileSkills(skill_id=Skills.objects.get(skill_id=each_skill['skill_id']),
+                                  user_id=UserAccount.objects.get(user_id=decoded_token["user_id"]),
+                                  profile_skill_id=str(uuid.uuid4()))
+            verified_skills.append(skill)
+        for skill in verified_skills:
+            skill.save()
+        return JsonResponse({"success": "Skills added successfully."}, status=status.HTTP_200_OK)
+    except ValidationError as v:
+        print(v.message)
+        return JsonResponse({"error": v.message}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except AttributeError:
+        return JsonResponse({"error": "Something went wrong!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def deleteSkill(request, skill_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        deleted_ = ProfileSkills.objects.filter(user_id=decoded_token['user_id'],
+                                                profile_skill_id=skill_id).delete()
+        if deleted_[0] == 0:
+            return JsonResponse({"error": "Skill not found."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"success": "Skill deleted successfully!"}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def GetProfileInformation(request, user_name):
+    pass
 
 
 @api_view(["GET"])

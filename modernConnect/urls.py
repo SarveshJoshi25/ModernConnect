@@ -36,7 +36,19 @@ urlpatterns = [
     path("user/delete/project_details/<str:project_id>/", views.deleteProjectDetails,
          name="Delete Work Details Separate"),
 
+    path("user/add/social_link/", views.UserAddSocialLink, name="Add social_link"),
+    path("user/get/social_link/", views.GetSocialLink, name="Get social_link"),
+    path("user/update/social_link/<str:social_link_id>/", views.editSocialLink,
+         name="Edit social_link"),
+    path("user/delete/social_link/<str:social_link_id>/", views.deleteSocialLink,
+         name="Delete social_link"),
 
+    path("user/add/skill/", views.UserAddSkill, name="Add skill"),
+    path("user/delete/skill/<str:skill_id>/", views.deleteSkill,
+         name="Delete Skill"),
+
+
+    path("profile/<str:user_name>", views.GetProfileInformation, name="GetProfileInformation"),
 
 
     path("get/degrees/", views.get_degree_types, name="Get Degrees"),

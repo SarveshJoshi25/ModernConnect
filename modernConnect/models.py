@@ -104,3 +104,18 @@ class ProjectDetails(models.Model):
 class ContextPost(models.Model):
     context_id = models.IntegerField(primary_key=True, editable=False)
     context_name = models.CharField(max_length=120, null=False, editable=True)
+
+
+class SocialLinks(models.Model):
+    social_link_id = models.CharField(primary_key=True, default=str(uuid.uuid4()), editable=False, max_length=60)
+    social_link_author = models.ForeignKey("UserAccount", verbose_name="social_link_author", on_delete=models.CASCADE)
+    social_link = models.URLField(null=False, max_length=1200, verbose_name="social_link", error_messages={
+        "null": "URL field can't be null."
+    })
+    social_link_title = models.CharField(max_length=120, verbose_name="social_link_title", null=False)
+
+
+class ProfileSkills(models.Model):
+    profile_skill_id = models.CharField(primary_key=True, default=str(uuid.uuid4()), editable=False, max_length=60)
+    user_id = models.ForeignKey("UserAccount", verbose_name="user_id", on_delete=models.CASCADE)
+    skill_id = models.ForeignKey("Skills", verbose_name="skill_id", on_delete=models.CASCADE)
