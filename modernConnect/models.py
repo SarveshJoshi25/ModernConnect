@@ -65,7 +65,7 @@ class WorkExperience(models.Model):
                                          error_messages={"null": "Work Organization can't be null."})
     first_day_at_work = models.DateField()
     is_current_employer = models.BooleanField(editable=True, error_messages={"error": "Current Employee value can "
-                                                                                      "only be Yes or No. "})
+                                                                                      "only be True or False. "})
     last_day_at_work = models.DateField(null=True)
     work_description = models.CharField(max_length=1200, null=True, editable=True)
     work_experience = models.CharField(max_length=120, null=True, editable=False)
@@ -143,3 +143,4 @@ class Posts(models.Model):
     post_content = models.CharField(verbose_name="post_content", max_length=480, null=False)
     post_context = models.ForeignKey("ContextPost", verbose_name="post_context", on_delete=models.CASCADE)
     skills = models.CharField(validators=[validate_comma_separated_integer_list], max_length=120)
+    post_active = models.BooleanField(default=True)

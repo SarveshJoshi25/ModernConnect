@@ -178,15 +178,6 @@ def validate_post(received_data, post_author):
                   poll_option_text=each_option).save()
 
 
-#     post_id = models.CharField(verbose_name="post_id", primary_key=True, default=str(uuid.uuid4()), editable=False,
-#                                max_length=60)
-#     post_author = models.ForeignKey("UserAccount", verbose_name="post_author", on_delete=models.CASCADE)
-#     posted_on = models.DateTimeField(verbose_name="posted_on", default=datetime.datetime.now(), editable=False)
-#     post_content = models.CharField(verbose_name="post_content", max_length=480, null=False)
-#     post_context = models.ForeignKey("ContextPost", verbose_name="post_context", on_delete=models.CASCADE)
-#     skills = models.CharField(validators=[validate_comma_separated_integer_list], max_length=120)
-
-
 def verify_education(list_of_education, user_id):
     verified_education = []
     for education in list_of_education:
@@ -1190,6 +1181,25 @@ def CreatePost(request):
     except Exception as e:
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def DeletePost(request, post_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        delete_this = Posts.objects.filter(post_author=decoded_token['user_id'],
+                                           post_id=post_id).update(post_active=False)
+        if delete_this == 0:
+            return JsonResponse({"error": "Requested Post doesn't exists."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"success": "Post deleted successfully!"}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["GET"])
