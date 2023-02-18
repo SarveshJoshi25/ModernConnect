@@ -133,6 +133,11 @@ class Polls(models.Model):
 class PollVotes(models.Model):
     poll_option_id = models.ForeignKey("Polls", verbose_name="poll_option_id", on_delete=models.CASCADE)
     voter_id = models.ForeignKey("UserAccount", verbose_name="post_author", on_delete=models.CASCADE)
+    post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
+
+class UpvotePosts(models.Model):
+    post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
+    upvote_by = models.ForeignKey("UserAccount", verbose_name="upvote_by", on_delete=models.CASCADE)
 
 
 class Posts(models.Model):

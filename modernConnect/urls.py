@@ -52,6 +52,9 @@ urlpatterns = [
 
     path("user/create/post/", views.CreatePost, name="CreatePost"),
     path("user/delete/post/<str:post_id>/", views.DeletePost, name="DeletePost"),
+    path("user/upvote/post/<str:post_id>/", views.UpvotePost, name="UpvotePost"),
+
+    path("user/vote/<str:option_id>/", views.Vote, name="Vote"),
 
     path("get/degrees/", views.get_degree_types, name="Get Degrees"),
     path("get/context/", views.getContext, name="getContext")

@@ -1,4 +1,5 @@
 import datetime
+import json
 
 import pymongo
 
@@ -12,7 +13,7 @@ from utils import db
 from email_validator import validate_email
 import validators
 from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails, ContextPost, Skills, \
-    SocialLinks, ProfileSkills, Posts, Polls
+    SocialLinks, ProfileSkills, Posts, Polls, UpvotePosts, PollVotes
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
@@ -1182,6 +1183,37 @@ def CreatePost(request):
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def UpvotePost(request, post_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+
+        post = Posts.objects.get(post_id=post_id)
+        already_exists = UpvotePosts.objects.filter(post_id=post_id,
+                                                    upvote_by=UserAccount.objects.get(user_id=decoded_token["user_id"]))
+
+        if already_exists:
+            already_exists.delete()
+            return JsonResponse({"success": "Disliked successfully!"}, status=status.HTTP_200_OK)
+
+        if not post.post_active:
+            return JsonResponse({"error": "The post is deleted."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        UpvotePosts(post_id=post, upvote_by=UserAccount.objects.get(
+            user_id=decoded_token["user_id"])).save()
+
+        return JsonResponse({"success": "Upvoted successfully!"}, status=status.HTTP_200_OK)
+
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def DeletePost(request, post_id):
@@ -1194,6 +1226,42 @@ def DeletePost(request, post_id):
             return JsonResponse({"error": "Requested Post doesn't exists."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
         return JsonResponse({"success": "Post deleted successfully!"}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def Vote(request, option_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        received_data = request.data
+
+        already_registered = PollVotes.objects.filter(voter_id=decoded_token['user_id'],
+                                                      post_id=received_data['post_id'])
+        if already_registered.count() > 0:
+            return JsonResponse({"error": "Invalid voting request, The vote has already been registered"},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        PollVotes(poll_option_id=Polls.objects.get(poll_option_id=option_id),
+                  voter_id=UserAccount.objects.get(user_id=decoded_token['user_id']),
+                  post_id=Posts.objects.get(post_id=received_data['post_id'])).save()
+
+        option_ids = list(Polls.objects.filter(post_id=received_data['post_id']).values("poll_option_id"))
+
+        total_votes = PollVotes.objects.filter(post_id=received_data['post_id']).count()
+
+        current_state = {}
+
+        for each_option in option_ids:
+            current_state[each_option['poll_option_id']] = round((PollVotes.objects.filter(poll_option_id=each_option['poll_option_id']).count() / total_votes) * 100, 2)
+
+        return JsonResponse({"current_vote_share": current_state}, status=status.HTTP_200_OK)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
