@@ -1,9 +1,12 @@
+import datetime
 import uuid
 
 from django.db import models
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.base_user import AbstractBaseUser
 from .userManagement import MyAccountManager
+import django.utils.timezone
+from django.core.validators import validate_comma_separated_integer_list
 
 
 class UserAccount(AbstractBaseUser):
@@ -119,3 +122,24 @@ class ProfileSkills(models.Model):
     profile_skill_id = models.CharField(primary_key=True, default=str(uuid.uuid4()), editable=False, max_length=60)
     user_id = models.ForeignKey("UserAccount", verbose_name="user_id", on_delete=models.CASCADE)
     skill_id = models.ForeignKey("Skills", verbose_name="skill_id", on_delete=models.CASCADE)
+
+
+class Polls(models.Model):
+    post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
+    poll_option_id = models.CharField(primary_key=True, verbose_name="poll_option_id", editable=False, max_length=60)
+    poll_option_text = models.CharField(verbose_name="poll_option_text", max_length=60)
+
+
+class PollVotes(models.Model):
+    poll_option_id = models.ForeignKey("Polls", verbose_name="poll_option_id", on_delete=models.CASCADE)
+    voter_id = models.ForeignKey("UserAccount", verbose_name="post_author", on_delete=models.CASCADE)
+
+
+class Posts(models.Model):
+    post_id = models.CharField(verbose_name="post_id", primary_key=True, default=str(uuid.uuid4()), editable=False,
+                               max_length=60)
+    post_author = models.ForeignKey("UserAccount", verbose_name="post_author", on_delete=models.CASCADE)
+    posted_on = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
+    post_content = models.CharField(verbose_name="post_content", max_length=480, null=False)
+    post_context = models.ForeignKey("ContextPost", verbose_name="post_context", on_delete=models.CASCADE)
+    skills = models.CharField(validators=[validate_comma_separated_integer_list], max_length=120)

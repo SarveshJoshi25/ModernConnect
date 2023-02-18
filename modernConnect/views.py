@@ -12,7 +12,7 @@ from utils import db
 from email_validator import validate_email
 import validators
 from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails, ContextPost, Skills, \
-    SocialLinks, ProfileSkills
+    SocialLinks, ProfileSkills, Posts, Polls
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
@@ -145,6 +145,46 @@ def set_degree(degree_id: int):
 
 def verify_degree(degree_id: int) -> bool:
     return db["degrees"].find({"degree_id": degree_id}).count() > 0
+
+
+def validate_post(received_data, post_author):
+    post_id = str(uuid.uuid4())
+
+    if len(str(received_data["post_content"])) <= 0:
+        raise Exception("Invalid Post Content.")
+
+    context = ContextPost.objects.get(context_id=received_data["context_id"])
+    post = Posts(post_id=post_id, post_author=UserAccount.objects.get(user_id=post_author), post_context=context,
+                 post_content=str(received_data["post_content"]))
+
+    if context.context_name == "#collaborate":
+        skills_str = str(received_data['skills'])
+        skill_list = skills_str.split(",")
+        if not (0 < len(skills_str) <= 3):
+            raise Exception("Invalid Skills")
+        for each in skill_list:
+            if Skills.objects.filter(skill_id=int(each)).count() == 0:
+                raise Exception("Invalid Skill.")
+        post.skills = str(received_data["skills"])
+
+    post.save()
+
+    if received_data["poll"] and context.context_name == "#ask":
+        poll_options = received_data["poll_options"]
+        if not (2 <= len(poll_options) <= 4):
+            raise Exception("Invalid Poll Options. (2 to 4 required)")
+        for each_option in poll_options:
+            Polls(post_id=Posts.objects.get(post_id=post_id), poll_option_id=str(uuid.uuid4()),
+                  poll_option_text=each_option).save()
+
+
+#     post_id = models.CharField(verbose_name="post_id", primary_key=True, default=str(uuid.uuid4()), editable=False,
+#                                max_length=60)
+#     post_author = models.ForeignKey("UserAccount", verbose_name="post_author", on_delete=models.CASCADE)
+#     posted_on = models.DateTimeField(verbose_name="posted_on", default=datetime.datetime.now(), editable=False)
+#     post_content = models.CharField(verbose_name="post_content", max_length=480, null=False)
+#     post_context = models.ForeignKey("ContextPost", verbose_name="post_context", on_delete=models.CASCADE)
+#     skills = models.CharField(validators=[validate_comma_separated_integer_list], max_length=120)
 
 
 def verify_education(list_of_education, user_id):
@@ -1129,6 +1169,27 @@ def deleteSkill(request, skill_id):
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def CreatePost(request):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        received_data = request.data
+
+        validate_post(received_data, decoded_token["user_id"])
+
+        return JsonResponse({"success": "Posted successfully!"}, status=status.HTTP_201_CREATED)
+
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
 
 
 @api_view(["GET"])

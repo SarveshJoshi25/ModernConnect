@@ -50,6 +50,7 @@ urlpatterns = [
 
     path("profile/<str:user_name>", views.GetProfileInformation, name="GetProfileInformation"),
 
+    path("user/create/post/", views.CreatePost, name="CreatePost"),
 
     path("get/degrees/", views.get_degree_types, name="Get Degrees"),
     path("get/context/", views.getContext, name="getContext")
