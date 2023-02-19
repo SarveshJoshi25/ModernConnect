@@ -13,7 +13,7 @@ from utils import db
 from email_validator import validate_email
 import validators
 from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails, ContextPost, Skills, \
-    SocialLinks, ProfileSkills, Posts, Polls, UpvotePosts, PollVotes
+    SocialLinks, ProfileSkills, Posts, Polls, UpvotePosts, PollVotes, reportAccount, reportPost
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
@@ -1259,9 +1259,58 @@ def Vote(request, option_id):
         current_state = {}
 
         for each_option in option_ids:
-            current_state[each_option['poll_option_id']] = round((PollVotes.objects.filter(poll_option_id=each_option['poll_option_id']).count() / total_votes) * 100, 2)
+            current_state[each_option['poll_option_id']] = round(
+                (PollVotes.objects.filter(poll_option_id=each_option['poll_option_id']).count() / total_votes) * 100, 2)
 
         return JsonResponse({"current_vote_share": current_state}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def ReportAccount(request, profile_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        received_data = request.data
+
+        if len(str(received_data['report_description'])) == 0:
+            return JsonResponse({"error": "Description can't be empty"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        if UserAccount.objects.filter(user_id=profile_id).count() == 0:
+            return JsonResponse({"error": "Invalid User Account."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        reportAccount(report_id=str(uuid.uuid4()), raised_by=UserAccount.objects.get(user_id=decoded_token['user_id']),
+                      report_description=received_data['report_description'], report_on=profile_id).save()
+        return JsonResponse({"success": "Report submitted successfully."}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def ReportPost(request, post_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        received_data = request.data
+
+        if len(str(received_data['report_description'])) == 0:
+            return JsonResponse({"error": "Description can't be empty"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        reportPost(report_id=str(uuid.uuid4()), raised_by=UserAccount.objects.get(user_id=decoded_token['user_id']),
+                   report_description=received_data['report_description'],
+                   report_on=Posts.objects.get(post_id=post_id)).save()
+        return JsonResponse({"success": "Report submitted successfully."}, status=status.HTTP_200_OK)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:

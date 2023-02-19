@@ -135,6 +135,7 @@ class PollVotes(models.Model):
     voter_id = models.ForeignKey("UserAccount", verbose_name="post_author", on_delete=models.CASCADE)
     post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
 
+
 class UpvotePosts(models.Model):
     post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
     upvote_by = models.ForeignKey("UserAccount", verbose_name="upvote_by", on_delete=models.CASCADE)
@@ -149,3 +150,30 @@ class Posts(models.Model):
     post_context = models.ForeignKey("ContextPost", verbose_name="post_context", on_delete=models.CASCADE)
     skills = models.CharField(validators=[validate_comma_separated_integer_list], max_length=120)
     post_active = models.BooleanField(default=True)
+
+
+class reportPost(models.Model):
+    report_id = models.CharField(verbose_name="report_id", primary_key=True, default=str(uuid.uuid4()), editable=False,
+                                 max_length=60)
+    raised_on = models.DateTimeField(verbose_name="raised_on", default=django.utils.timezone.now, editable=False)
+    raised_by = models.ForeignKey("UserAccount", verbose_name="raised_by", on_delete=models.CASCADE)
+    report_description = models.CharField(verbose_name="report_description", max_length=2000, null=False)
+    report_on = models.ForeignKey("Posts", verbose_name="report_post", on_delete=models.CASCADE)
+
+#
+# class ReportComment(models.Model):
+#     report_id = models.CharField(verbose_name="report_id", primary_key=True, default=str(uuid.uuid4()), editable=False,
+#                                  max_length=60)
+#     raised_on = models.DateTimeField(verbose_name="raised_on", default=django.utils.timezone.now, editable=False)
+#     raised_by = models.ForeignKey("UserAccount", verbose_name="raised_by", on_delete=models.CASCADE)
+#     report_description = models.CharField(verbose_name="report_description", max_length=2000, null=False)
+#     report_on = models.ForeignKey("", verbose_name="report_id", on_delete=models.CASCADE)
+
+
+class reportAccount(models.Model):
+    report_id = models.CharField(verbose_name="report_id", primary_key=True, default=str(uuid.uuid4()), editable=False,
+                                 max_length=60)
+    raised_on = models.DateTimeField(verbose_name="raised_on", default=django.utils.timezone.now, editable=False)
+    raised_by = models.ForeignKey("UserAccount", verbose_name="raised_by", on_delete=models.CASCADE)
+    report_description = models.CharField(verbose_name="report_description", max_length=2000, null=False)
+    report_on = models.CharField(editable=False, max_length=60, verbose_name="report_account")
