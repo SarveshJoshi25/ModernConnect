@@ -148,6 +148,46 @@ Sample Input:
   ```
 Output: A 200 response on OK, and 406 on error.
 ****
+#### Get Educational Details 
+This URL needs to be called for getting educational details of the users. 
+Call to this needs user to be logged-in.
+
+```http
+  GET /api/v1/user/get/educational_details/
+```
+**No Parameters required.**
+
+### Sample Output : 
+```
+{
+    "educational_details": [
+        {
+            "education_id": "e42a557c-4846-41bd-93f5-25c4a8e2a24f",
+            "institute": "Government Polytechnic, Pune",
+            "location": "Pune, Maharashtra",
+            "enrollment_year": 2018,
+            "completion_year": 2021,
+            "degree": "Diploma",
+            "stream": "Computer Engineering",
+            "grade": "93.8",
+            "user_id": "21e8ccd8-44b9-4e08-ab4f-e0546d56de3b"
+        },
+        {
+            "education_id": "c06cace5-69d8-4ae4-9202-c1e9a019c213",
+            "institute": "Modern College of Engineering, Pune",
+            "location": "Pune, Maharashtra",
+            "enrollment_year": 2021,
+            "completion_year": 2024,
+            "degree": "Bachelor Degree",
+            "stream": "Information Technology",
+            "grade": "8.7",
+            "user_id": "21e8ccd8-44b9-4e08-ab4f-e0546d56de3b"
+        }
+    ]
+}
+```
+
+
 
 ## Authors
 
