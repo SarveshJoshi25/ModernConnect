@@ -1,6 +1,4 @@
 import datetime
-import json
-
 import pymongo
 
 from .threads import sendVerificationEmail
@@ -1255,6 +1253,28 @@ def Vote(request, option_id):
         option_ids = list(Polls.objects.filter(post_id=received_data['post_id']).values("poll_option_id"))
 
         total_votes = PollVotes.objects.filter(post_id=received_data['post_id']).count()
+
+        current_state = {}
+
+        for each_option in option_ids:
+            current_state[each_option['poll_option_id']] = round(
+                (PollVotes.objects.filter(poll_option_id=each_option['poll_option_id']).count() / total_votes) * 100, 2)
+
+        return JsonResponse({"current_vote_share": current_state}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def GetVoteResult(request, post_id):
+    try:
+        option_ids = list(Polls.objects.filter(post_id=post_id).values("poll_option_id"))
+        total_votes = PollVotes.objects.filter(post_id=post_id).count()
 
         current_state = {}
 

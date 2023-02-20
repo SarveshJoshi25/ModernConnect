@@ -55,6 +55,7 @@ urlpatterns = [
     path("user/upvote/post/<str:post_id>/", views.UpvotePost, name="UpvotePost"),
 
     path("user/vote/<str:option_id>/", views.Vote, name="Vote"),
+    path("user/get/poll/result/<str:post_id>/", views.GetVoteResult, name="GetVoteResult"),
 
     path("user/report/account/<str:profile_id>/", views.ReportAccount, name="ReportAccount"),
     path("user/report/post/<str:post_id>/", views.ReportPost, name="ReportPost"),
