@@ -11,7 +11,7 @@ from utils import db
 from email_validator import validate_email
 import validators
 from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails, ContextPost, Skills, \
-    SocialLinks, ProfileSkills, Posts, Polls, UpvotePosts, PollVotes, reportAccount, reportPost
+    SocialLinks, ProfileSkills, Posts, Polls, UpvotePosts, PollVotes, reportAccount, reportPost, Comment, reportComment
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
@@ -1234,6 +1234,55 @@ def DeletePost(request, post_id):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def AddComment(request, post_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        received_data = request.data
+
+        post = Posts.objects.get(post_id=post_id)
+
+        if len(received_data['content'].strip()) == 0:
+            raise Exception("Invalid Comment - Comment can't be empty.")
+
+        if not post.post_active:
+            raise Exception("The post is deleted.")
+
+        Comment(author_id=UserAccount.objects.get(user_id=decoded_token['user_id']),
+                post_id=post, content=received_data['content']).save()
+
+        return JsonResponse({"success": "Commented successfully!"}, status=status.HTTP_200_OK)
+
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def DeleteComment(request, comment_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        delete_this = Comment.objects.filter(author_id=decoded_token['user_id'], comment_id=comment_id). \
+            update(comment_active=False)
+        if delete_this == 0:
+            return JsonResponse({"error": "Requested Comment doesn't exists."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"success": "Comment deleted successfully!"}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def Vote(request, option_id):
     try:
         received_token = request.COOKIES.get("JWT_TOKEN")
@@ -1299,7 +1348,7 @@ def ReportAccount(request, profile_id):
         decoded_token = decode_jwt_token(received_token)
         received_data = request.data
 
-        if len(str(received_data['report_description'])) == 0:
+        if len(str(received_data['report_description']).strip()) == 0:
             return JsonResponse({"error": "Description can't be empty"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
         if UserAccount.objects.filter(user_id=profile_id).count() == 0:
@@ -1324,12 +1373,35 @@ def ReportPost(request, post_id):
         decoded_token = decode_jwt_token(received_token)
         received_data = request.data
 
-        if len(str(received_data['report_description'])) == 0:
+        if len(str(received_data['report_description']).strip()) == 0:
             return JsonResponse({"error": "Description can't be empty"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
         reportPost(report_id=str(uuid.uuid4()), raised_by=UserAccount.objects.get(user_id=decoded_token['user_id']),
                    report_description=received_data['report_description'],
                    report_on=Posts.objects.get(post_id=post_id)).save()
+        return JsonResponse({"success": "Report submitted successfully."}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def ReportComment(request, comment_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+        received_data = request.data
+
+        if len(str(received_data['report_description']).strip()) == 0:
+            return JsonResponse({"error": "Description can't be empty"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        reportComment(raised_by=UserAccount.objects.get(user_id=decoded_token['user_id']),
+                      report_description=received_data['report_description'],
+                      report_on=Comment.objects.get(comment_id=comment_id)).save()
         return JsonResponse({"success": "Report submitted successfully."}, status=status.HTTP_200_OK)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)

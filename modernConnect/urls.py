@@ -59,6 +59,10 @@ urlpatterns = [
 
     path("user/report/account/<str:profile_id>/", views.ReportAccount, name="ReportAccount"),
     path("user/report/post/<str:post_id>/", views.ReportPost, name="ReportPost"),
+    path("user/report/comment/<str:comment_id>/", views.ReportComment, name="ReportComment"),
+
+    path("user/add/comment/<str:post_id>/", views.AddComment, name="AddComment"),
+    path("user/delete/comment/<str:comment_id>/", views.DeleteComment, name="DeletePost"),
 
     path("get/degrees/", views.get_degree_types, name="Get Degrees"),
     path("get/context/", views.getContext, name="getContext")
