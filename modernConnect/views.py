@@ -374,10 +374,12 @@ def UserSignup(request):
 
         token = Token.objects.create(user=account)
 
-        jsonResponse = JsonResponse({"Response": "Account created successfully! "})
-        jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_object['user_id'],
-                                                                          user_object['account_type']))
-        jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
+        jsonResponse = JsonResponse({"Response": "Account created successfully! ", "JWT_TOKEN": generate_jwt_token(
+            user_id=account.user_id, account_type=account.user_account_type),
+                                     "AUTHENTICATION_TOKEN": "Token " + str(token)})
+        # jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_object['user_id'],
+        #                                                                   user_object['account_type']))
+        # jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
         return jsonResponse
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -529,10 +531,10 @@ def UserLogin(request):
 
             # user.is_active = True
             # user.last_login = datetime.datetime.now()
-            jsonResponse = JsonResponse({"Response": "Logged In Successfully! "})
-            jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_id=user.user_id,
-                                                                              account_type=user.user_account_type))
-            jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
+            jsonResponse = JsonResponse({"Response": "Logged In Successfully! ", "JWT_TOKEN": generate_jwt_token(
+                user_id=user.user_id, account_type=user.user_account_type), "AUTHENTICATION_TOKEN": "Token " + str(token)})
+            # jsonResponse.set_cookie(key="JWT_TOKEN", value=)
+            # jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
             return jsonResponse
         else:
             return JsonResponse({"response": "Username and Password didn't match."},
