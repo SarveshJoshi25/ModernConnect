@@ -156,10 +156,20 @@ class Comment(models.Model):
     comment_id = models.CharField(verbose_name="comment_id", primary_key=True, default=str(uuid.uuid4()),
                                   editable=False, max_length=60)
     author_id = models.ForeignKey("UserAccount", verbose_name="author_id", on_delete=models.CASCADE)
-    post_id = models.ForeignKey("Posts", verbose_name="report_post", on_delete=models.CASCADE)
+    post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
     timestamp = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
-    content = models.CharField(verbose_name="post_content", max_length=480, null=False)
+    content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
     comment_active = models.BooleanField(default=True)
+
+
+class Reply(models.Model):
+    reply_id = models.CharField(verbose_name="reply_id", primary_key=True, default=str(uuid.uuid4()),
+                                editable=False, max_length=60)
+    author_id = models.ForeignKey("UserAccount", verbose_name="author_id", on_delete=models.CASCADE)
+    comment_id = models.ForeignKey("Comment", verbose_name="parent_comment_id", on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
+    content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
+    reply_active = models.BooleanField(default=True)
 
 
 class reportPost(models.Model):

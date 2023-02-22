@@ -64,6 +64,9 @@ urlpatterns = [
     path("user/add/comment/<str:post_id>/", views.AddComment, name="AddComment"),
     path("user/delete/comment/<str:comment_id>/", views.DeleteComment, name="DeletePost"),
 
+    path("user/add/reply/<str:comment_id>/", views.AddReply, name="AddReply"),
+    path("user/delete/reply/<str:reply_id>/", views.DeleteReply, name="DeleteReply"),
+
     path("get/degrees/", views.get_degree_types, name="Get Degrees"),
     path("get/context/", views.getContext, name="getContext")
 ]

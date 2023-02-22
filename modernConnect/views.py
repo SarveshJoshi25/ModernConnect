@@ -11,7 +11,8 @@ from utils import db
 from email_validator import validate_email
 import validators
 from .models import UserAccount, WorkExperience, EducationalExperience, ProjectDetails, ContextPost, Skills, \
-    SocialLinks, ProfileSkills, Posts, Polls, UpvotePosts, PollVotes, reportAccount, reportPost, Comment, reportComment
+    SocialLinks, ProfileSkills, Posts, Polls, UpvotePosts, PollVotes, reportAccount, reportPost, Comment, \
+    reportComment, Reply
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
@@ -1325,6 +1326,60 @@ def DeleteComment(request, comment_id):
             return JsonResponse({"error": "Requested Comment doesn't exists."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
         return JsonResponse({"success": "Comment deleted successfully!"}, status=status.HTTP_200_OK)
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def AddReply(request, comment_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+
+        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+            raise Exception("User is not verified, Please verify your email address first.")
+
+        received_data = request.data
+
+        comment = Comment.objects.get(comment_id=comment_id)
+
+        if len(received_data['content'].strip()) == 0:
+            raise Exception("Invalid Reply - Reply can't be empty.")
+
+        if not comment.comment_active:
+            raise Exception("The Comment is deleted.")
+
+        Reply(author_id=UserAccount.objects.get(user_id=decoded_token['user_id']),
+              comment_id=comment, content=received_data['content']).save()
+
+        return JsonResponse({"success": "Replied successfully!"}, status=status.HTTP_200_OK)
+
+    except KeyError:
+        return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except jwt.exceptions.DecodeError:
+        return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def DeleteReply(request, reply_id):
+    try:
+        received_token = request.COOKIES.get("JWT_TOKEN")
+        decoded_token = decode_jwt_token(received_token)
+
+        delete_this = Reply.objects.filter(author_id=decoded_token['user_id'], reply_id=reply_id). \
+            update(reply_active=False)
+        if delete_this == 0:
+            return JsonResponse({"error": "Requested Reply doesn't exists."},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
+        return JsonResponse({"success": "Reply deleted successfully!"}, status=status.HTTP_200_OK)
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except jwt.exceptions.DecodeError:
