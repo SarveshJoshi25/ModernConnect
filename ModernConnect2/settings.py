@@ -17,7 +17,6 @@ from config import mongodb_username, mongodb_password, mongodb_cluster, secret_k
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
@@ -28,7 +27,6 @@ SECRET_KEY = secret_key
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -78,23 +76,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'ModernConnect2.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {
-        'default': {
-            'ENGINE': 'djongo',
-            'NAME': 'modernconnect',
-            'ENFORCE_SCHEMA': False,
-            'CLIENT': {
-                'host': f'mongodb+srv://{mongodb_username}:{mongodb_password}@{mongodb_cluster}/?retryWrites=true',
-                'uuidRepresentation': 'standard',
-                'waitQueueTimeoutMS': 30000
-            }
+    'default': {
+        'ENGINE': 'djongo',
+        'NAME': 'modernconnect',
+        'ENFORCE_SCHEMA': False,
+        'CLIENT': {
+            'host': f'mongodb+srv://{mongodb_username}:{mongodb_password}@{mongodb_cluster}/?retryWrites=true',
+            'uuidRepresentation': 'standard',
+            'waitQueueTimeoutMS': 30000
         }
+    }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -114,7 +110,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
@@ -125,7 +120,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
@@ -154,5 +148,9 @@ AUTH_USER_MODEL = 'modernConnect.UserAccount'
 
 CORS_ORIGIN_ALLOW_ALL = True
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+CORS_ORIGIN_WHITELIST = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+]
 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
