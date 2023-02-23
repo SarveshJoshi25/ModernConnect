@@ -22,6 +22,16 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 
 
+def verifyAuthenticationHeader(request) -> UserAccount:
+    try:
+        authenticationToken = str(request.headers['Authorization']).split(" ")[1]
+        # (str(request.COOKIES.get("Authorization")).split(" "))[1]
+        fetchedUserAccount = db["authtoken_token"].find_one({"key": authenticationToken})
+        return UserAccount.objects.get(user_id=fetchedUserAccount['user_id'])
+    except Exception as e:
+        raise Exception(e.args)
+
+
 def encrypt_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
@@ -107,7 +117,7 @@ def validate_user_name(user_name: str):
     if user_name.lower()[0] == '_' or user_name.lower()[-1] == '_':
         raise Exception("error: Invalid Username (Underscores can't exist at front or rear ends of username) ")
     collection_name = db["user_accounts"]
-    if len(list(collection_name.find({'user_name': user_name, "user_if_email_verified": True}))):
+    if len(list(collection_name.find({'user_name': user_name}))):
         raise Exception("error: Invalid Username (Username already registered) ")
     return True
 
@@ -123,19 +133,6 @@ def validate_user_email(user):
     if len(list(collection_name.find({'user_email': str(user['email_address']), "user_if_email_verified": True}))):
         raise Exception("error: Invalid Email Address (Email Address already registered) ")
     return True
-
-
-def generate_jwt_token(user_id, account_type):
-    return jwt.encode({"user_id": user_id, "account_type": account_type}, jwt_secret, algorithm="HS256")
-
-
-def decode_jwt_token(received_token: str):
-    return jwt.decode(received_token, jwt_secret, algorithms="HS256")
-
-
-def get_user_account_type(received_token: str) -> str:
-    decoded_token = decode_jwt_token(received_token)
-    return str(decoded_token.get("account_type"))
 
 
 def set_degree(degree_id: int):
@@ -374,12 +371,8 @@ def UserSignup(request):
 
         token = Token.objects.create(user=account)
 
-        jsonResponse = JsonResponse({"Response": "Account created successfully! ", "JWT_TOKEN": generate_jwt_token(
-            user_id=account.user_id, account_type=account.user_account_type),
-                                     "AUTHENTICATION_TOKEN": "Token " + str(token)})
-        # jsonResponse.set_cookie(key="JWT_TOKEN", value=generate_jwt_token(user_object['user_id'],
-        #                                                                   user_object['account_type']))
-        # jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
+        jsonResponse = JsonResponse({"Response": "Account created successfully! "}, status=status.HTTP_200_OK)
+        jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
         return jsonResponse
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -391,10 +384,7 @@ def UserSignup(request):
 @permission_classes([AllowAny])
 def editUserDetails(request):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        authenticate_this = decode_jwt_token(received_token)
-
-        requesting_user = UserAccount.objects.get(user_id=authenticate_this['user_id'])
+        requesting_user = verifyAuthenticationHeader(request)
 
         if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
@@ -408,11 +398,13 @@ def editUserDetails(request):
         #     "contact_number": "9373496540",
         #     "about_yourself": "Backend Developer, and developer of this platform."
 
-        requesting_user.update(user_full_name=received_data['full_name'],
-                               user_account_type=received_data['account_type'],
-                               user_gender=received_data['gender'],
-                               user_contact=received_data['contact_number'],
-                               user_bio=received_data['about_yourself'])
+        requesting_user.user_full_name = received_data['full_name']
+        requesting_user.user_account_type = received_data['account_type']
+        requesting_user.user_gender = received_data['gender']
+        requesting_user.user_contact = received_data['contact_number']
+        requesting_user.user_bio = received_data['about_yourself']
+
+        requesting_user.save()
 
         return JsonResponse({"message": "Updated data successfully."})
     except KeyError:
@@ -430,11 +422,14 @@ def userLogout(request):
         :param request: None.
         :return: Status code 200.
         """
-        db["authtoken_token"].delete_one(
-            filter={"user_id": decode_jwt_token(request.COOKIES.get("JWT_TOKEN"))["user_id"]})
+        requesting_user = verifyAuthenticationHeader(request)
+
+        db["authtoken_token"].delete_one(filter={"user_id": requesting_user.user_id})
         return JsonResponse({"success": "Logged Out."})
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(["POST"])
@@ -449,38 +444,28 @@ def verifyEmailAddress(request):
     :return: Status 200 on successful verification, OR status 406 with error message on generation of errors.
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        authenticate_this = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
         received_data = request.data
         user_entered_otp = str(received_data.get('otp')).strip()
 
-        user_collection = db['user_accounts']
         collection_name = db['email_validation']
-        requesting_user = user_collection.find_one({'user_id': authenticate_this.get("user_id")})
-        if requesting_user['user_if_email_verified']:
+
+        if requesting_user.user_if_email_verified:
             return JsonResponse({"response": "Your email is already verified!"}, status=status.HTTP_200_OK)
 
-        if not len(list(collection_name.find({'user_id': authenticate_this.get("user_id")}))):
+        if not len(list(collection_name.find({'user_id': requesting_user.user_id}))):
             return JsonResponse({"error": "Can't find your request for OTP at database. Please re-request for "
                                           "Verification Email."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
         if not bcrypt.checkpw(password=user_entered_otp.encode("utf-8"), hashed_password=(
-                collection_name.find_one({"user_id": authenticate_this.get("user_id")})['otp']).encode("utf-8")):
+                collection_name.find_one({"user_id": requesting_user.user_id})['otp']).encode("utf-8")):
             return JsonResponse({"error": "Incorrect OTP."}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
-        collection_name.delete_one({"user_id": authenticate_this.get("user_id")})
+        collection_name.delete_one({"user_id": requesting_user.user_id})
 
-        user_collection.find_one_and_update(
-            filter={
-                'user_id': str(authenticate_this.get("user_id"))
-            },
-            update=
-            {
-                "$set": {
-                    'user_if_email_verified': True
-                }
-            })
-
+        requesting_user.user_if_email_verified = True
+        requesting_user.save()
         return JsonResponse({"response": "Your Email has been verified. Now you can access all features for the Users"},
                             status=status.HTTP_200_OK)
     except KeyError:
@@ -528,13 +513,8 @@ def UserLogin(request):
                         'last_login': datetime.datetime.now()
                     }
                 })
-
-            # user.is_active = True
-            # user.last_login = datetime.datetime.now()
-            jsonResponse = JsonResponse({"Response": "Logged In Successfully! ", "JWT_TOKEN": generate_jwt_token(
-                user_id=user.user_id, account_type=user.user_account_type), "AUTHENTICATION_TOKEN": "Token " + str(token)})
-            # jsonResponse.set_cookie(key="JWT_TOKEN", value=)
-            # jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
+            jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
+            jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
             return jsonResponse
         else:
             return JsonResponse({"response": "Username and Password didn't match."},
@@ -592,15 +572,15 @@ def UserAddEducationalDetails(request):
     :return: Status 200 on success, or Status 406 on errors.
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
+        requesting_user = verifyAuthenticationHeader(request)
+
         received_data = request.data
         list_of_education = list(received_data.get("educational_data"))
-        decoded_token = decode_jwt_token(received_token)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
-        verified_education = verify_education(list_of_education, decoded_token["user_id"])
+        verified_education = verify_education(list_of_education, requesting_user.user_id)
         for v in verified_education:
             v.save()
         return JsonResponse({"success": "Education added successfully."}, status=status.HTTP_200_OK)
@@ -620,10 +600,9 @@ def getEducationalDetails(request):
     :return: Status 200 on success, OR Status 406 for errors.
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        educational_details = EducationalExperience.objects.filter(user_id=decoded_token['user_id']).order_by(
+        educational_details = EducationalExperience.objects.filter(user_id=requesting_user.user_id).order_by(
             "enrollment_year").values()
         educational_details = list(educational_details)
         return JsonResponse({"educational_details": educational_details}, status=status.HTTP_200_OK)
@@ -657,17 +636,17 @@ def editEducationalDetailsSeparate(request, education_id):
 
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
-        fetched_details = EducationalExperience.objects.filter(user_id=decoded_token['user_id'],
+        requesting_user = verifyAuthenticationHeader(request)
+
+        fetched_details = EducationalExperience.objects.filter(user_id=requesting_user.user_id,
                                                                education_id=education_id)
         if fetched_details.count() == 0:
             return JsonResponse({"error": "Invalid Educational ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
         received_data = request.data
         educational_list = [received_data]
 
-        educational_list = verify_education(educational_list, decoded_token["user_id"])
-        EducationalExperience.objects.filter(user_id=decoded_token['user_id'], education_id=education_id).delete()
+        educational_list = verify_education(educational_list, requesting_user.user_id)
+        EducationalExperience.objects.filter(user_id=requesting_user.user_id, education_id=education_id).delete()
         educational_list[0].save()
         return JsonResponse({"success": "Educational details are updated!"}, status=status.HTTP_200_OK)
 
@@ -691,10 +670,9 @@ def deleteEducationalDetailsSeparate(request, education_id):
     :return:
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        deleted_ = EducationalExperience.objects.filter(user_id=decoded_token['user_id'],
+        deleted_ = EducationalExperience.objects.filter(user_id=requesting_user.user_id,
                                                         education_id=education_id).delete()
         if deleted_[0] == 0:
             return JsonResponse({"error": "Requested Educational Experience not found."},
@@ -736,15 +714,15 @@ def UserAddWorkExperience(request):
 
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
+        requesting_user = verifyAuthenticationHeader(request)
+
         received_data = request.data
         list_of_work = list(received_data.get("work_data"))
-        decoded_token = decode_jwt_token(received_token)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
-        list_of_verified_work = verify_work(list_of_work, decoded_token["user_id"])
+        list_of_verified_work = verify_work(list_of_work, requesting_user.user_id)
         for verified_work in list_of_verified_work:
             verified_work.save()
         return JsonResponse({"success": "Work Experience added successfully."}, status=status.HTTP_200_OK)
@@ -771,10 +749,9 @@ def GetWorkDetails(request):
     """
 
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        work_details = WorkExperience.objects.filter(user_id=decoded_token['user_id']).order_by(
+        work_details = WorkExperience.objects.filter(user_id=requesting_user.user_id).order_by(
             'first_day_at_work').values()
         for each in work_details:
             if each['is_current_employer']:
@@ -813,16 +790,15 @@ def editWorkDetailsSeparate(request, work_id):
     :return: A 200 Status code, 406 for errors.
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        fetched_details = WorkExperience.objects.filter(user_id=decoded_token['user_id'], work_experience_id=work_id)
+        fetched_details = WorkExperience.objects.filter(user_id=requesting_user.user_id, work_experience_id=work_id)
         if fetched_details.count() == 0:
             return JsonResponse({"error": "Invalid Work ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
         received_data = request.data
         work_list = [received_data]
-        work_list = verify_work(work_list, decoded_token["user_id"])
-        WorkExperience.objects.filter(user_id=decoded_token['user_id'], work_experience_id=work_id).delete()
+        work_list = verify_work(work_list, requesting_user.user_id)
+        WorkExperience.objects.filter(user_id=requesting_user.user_id, work_experience_id=work_id).delete()
         work = work_list[0]
         work.work_experience_id = work_id
         work.save()
@@ -850,10 +826,9 @@ def deleteWorkDetails(request, work_id):
         :return: A Status 200 on Success, and 406 on errors.
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        deleted_ = WorkExperience.objects.filter(user_id=decoded_token['user_id'], work_experience_id=work_id).delete()
+        deleted_ = WorkExperience.objects.filter(user_id=requesting_user.user_id, work_experience_id=work_id).delete()
         if deleted_[0] == 0:
             return JsonResponse({"error": "Requested Work Experience not found."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -895,15 +870,15 @@ def UserAddProjectExperience(request):
 
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
+        requesting_user = verifyAuthenticationHeader(request)
+
         received_data = request.data
         list_of_projects = list(received_data.get("projects"))
-        decoded_token = decode_jwt_token(received_token)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
-        list_of_verified_projects = verify_projects(list_of_projects, decoded_token["user_id"])
+        list_of_verified_projects = verify_projects(list_of_projects, requesting_user.user_id)
         for verified_project in list_of_verified_projects:
             verified_project.save()
         return JsonResponse({"success": "Projects added successfully."}, status=status.HTTP_200_OK)
@@ -930,10 +905,9 @@ def GetProjectDetails(request):
     """
 
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        project_details = ProjectDetails.objects.filter(user_id=decoded_token['user_id']).values()
+        project_details = ProjectDetails.objects.filter(user_id=requesting_user.user_id).values()
         return JsonResponse({"project_details": list(project_details)}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -960,16 +934,15 @@ def editProjectDetailsSeparate(request, project_id):
     :return: A 200 Status code, 406 for errors.
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        fetched_details = ProjectDetails.objects.filter(user_id=decoded_token['user_id'], project_id=project_id)
+        fetched_details = ProjectDetails.objects.filter(user_id=requesting_user.user_id, project_id=project_id)
         if fetched_details.count() == 0:
             return JsonResponse({"error": "Invalid Project ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
         received_data = request.data
         project_list = [received_data]
-        project_list = verify_projects(project_list, decoded_token["user_id"])
-        ProjectDetails.objects.filter(user_id=decoded_token['user_id'], project_id=project_id).delete()
+        project_list = verify_projects(project_list, requesting_user.user_id)
+        ProjectDetails.objects.filter(user_id=requesting_user.user_id, project_id=project_id).delete()
         project = project_list[0]
         project.project_id = project_id
         project.save()
@@ -997,10 +970,9 @@ def deleteProjectDetails(request, project_id):
         :return: A Status 200 on Success, and 406 on errors.
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        deleted_ = ProjectDetails.objects.filter(user_id=decoded_token['user_id'], project_id=project_id).delete()
+        deleted_ = ProjectDetails.objects.filter(user_id=requesting_user.user_id, project_id=project_id).delete()
         if deleted_[0] == 0:
             return JsonResponse({"error": "Requested Project Details not found."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -1033,15 +1005,15 @@ def UserAddSocialLink(request):
     :return:
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
+        requesting_user = verifyAuthenticationHeader(request)
+
         received_data = request.data
         list_of_links = list(received_data.get("social_links"))
-        decoded_token = decode_jwt_token(received_token)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
-        list_of_verified_social_links = verify_links(list_of_links, decoded_token["user_id"])
+        list_of_verified_social_links = verify_links(list_of_links, requesting_user.user_id)
         for verified_links in list_of_verified_social_links:
             verified_links.save()
         return JsonResponse({"success": "Social Links added successfully."}, status=status.HTTP_200_OK)
@@ -1062,13 +1034,12 @@ def UserAddSocialLink(request):
 @permission_classes([IsAuthenticated])
 def GetSocialLink(request):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
-        link_details = SocialLinks.objects.filter(social_link_author=decoded_token['user_id']).values()
+        link_details = SocialLinks.objects.filter(social_link_author=requesting_user.user_id).values()
         return JsonResponse({"social_links": list(link_details)}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -1080,19 +1051,18 @@ def GetSocialLink(request):
 @permission_classes([IsAuthenticated])
 def editSocialLink(request, social_link_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        fetched_details = SocialLinks.objects.filter(social_link_author=decoded_token['user_id'],
+        fetched_details = SocialLinks.objects.filter(social_link_author=requesting_user.user_id,
                                                      social_link_id=social_link_id)
         if fetched_details.count() == 0:
             return JsonResponse({"error": "Invalid Social Link ID."}, status=status.HTTP_406_NOT_ACCEPTABLE)
         received_data = request.data
 
         social_link_list = [received_data]
-        social_link_list = verify_links(social_link_list, decoded_token["user_id"])
+        social_link_list = verify_links(social_link_list, requesting_user.user_id)
 
-        update_this = SocialLinks.objects.filter(social_link_author=decoded_token['user_id'],
+        update_this = SocialLinks.objects.filter(social_link_author=requesting_user.user_id,
                                                  social_link_id=social_link_id)
         update_this.update(social_link=social_link_list[0].social_link,
                            social_link_title=social_link_list[0].social_link_title)
@@ -1115,10 +1085,9 @@ def editSocialLink(request, social_link_id):
 @permission_classes([IsAuthenticated])
 def deleteSocialLink(request, social_link_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        deleted_ = SocialLinks.objects.filter(social_link_author=decoded_token['user_id'],
+        deleted_ = SocialLinks.objects.filter(social_link_author=requesting_user.user_id,
                                               social_link_id=social_link_id).delete()
         if deleted_[0] == 0:
             return JsonResponse({"error": "Requested Social Link Details not found."},
@@ -1152,18 +1121,18 @@ def UserAddSkill(request):
     :return:
     """
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
+        requesting_user = verifyAuthenticationHeader(request)
+
         received_data = request.data
         list_of_skills = list(received_data.get("skills"))
-        decoded_token = decode_jwt_token(received_token)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         verified_skills = []
         for each_skill in list_of_skills:
             skill = ProfileSkills(skill_id=Skills.objects.get(skill_id=each_skill['skill_id']),
-                                  user_id=UserAccount.objects.get(user_id=decoded_token["user_id"]),
+                                  user_id=requesting_user.user_id,
                                   profile_skill_id=str(uuid.uuid4()))
             verified_skills.append(skill)
         for skill in verified_skills:
@@ -1186,10 +1155,9 @@ def UserAddSkill(request):
 @permission_classes([IsAuthenticated])
 def deleteSkill(request, skill_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        deleted_ = ProfileSkills.objects.filter(user_id=decoded_token['user_id'],
+        deleted_ = ProfileSkills.objects.filter(user_id=requesting_user.user_id,
                                                 profile_skill_id=skill_id).delete()
         if deleted_[0] == 0:
             return JsonResponse({"error": "Skill not found."},
@@ -1207,15 +1175,14 @@ def deleteSkill(request, skill_id):
 @permission_classes([IsAuthenticated])
 def CreatePost(request):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         received_data = request.data
 
-        validate_post(received_data, decoded_token["user_id"])
+        validate_post(received_data, requesting_user.user_id)
 
         return JsonResponse({"success": "Posted successfully!"}, status=status.HTTP_201_CREATED)
 
@@ -1231,15 +1198,14 @@ def CreatePost(request):
 @permission_classes([IsAuthenticated])
 def UpvotePost(request, post_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         post = Posts.objects.get(post_id=post_id)
         already_exists = UpvotePosts.objects.filter(post_id=post_id,
-                                                    upvote_by=UserAccount.objects.get(user_id=decoded_token["user_id"]))
+                                                    upvote_by=UserAccount.objects.get(user_id=requesting_user.user_id))
 
         if already_exists:
             already_exists.delete()
@@ -1249,7 +1215,7 @@ def UpvotePost(request, post_id):
             return JsonResponse({"error": "The post is deleted."}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
         UpvotePosts(post_id=post, upvote_by=UserAccount.objects.get(
-            user_id=decoded_token["user_id"])).save()
+            user_id=requesting_user.user_id)).save()
 
         return JsonResponse({"success": "Upvoted successfully!"}, status=status.HTTP_200_OK)
 
@@ -1265,10 +1231,9 @@ def UpvotePost(request, post_id):
 @permission_classes([IsAuthenticated])
 def DeletePost(request, post_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        delete_this = Posts.objects.filter(post_author=decoded_token['user_id'],
+        delete_this = Posts.objects.filter(post_author=requesting_user.user_id,
                                            post_id=post_id).update(post_active=False)
         if delete_this == 0:
             return JsonResponse({"error": "Requested Post doesn't exists."},
@@ -1286,10 +1251,9 @@ def DeletePost(request, post_id):
 @permission_classes([IsAuthenticated])
 def AddComment(request, post_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         received_data = request.data
@@ -1302,7 +1266,7 @@ def AddComment(request, post_id):
         if not post.post_active:
             raise Exception("The post is deleted.")
 
-        Comment(author_id=UserAccount.objects.get(user_id=decoded_token['user_id']),
+        Comment(author_id=UserAccount.objects.get(user_id=requesting_user.user_id),
                 post_id=post, content=received_data['content']).save()
 
         return JsonResponse({"success": "Commented successfully!"}, status=status.HTTP_200_OK)
@@ -1319,10 +1283,9 @@ def AddComment(request, post_id):
 @permission_classes([IsAuthenticated])
 def DeleteComment(request, comment_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        delete_this = Comment.objects.filter(author_id=decoded_token['user_id'], comment_id=comment_id). \
+        delete_this = Comment.objects.filter(author_id=requesting_user.user_id, comment_id=comment_id). \
             update(comment_active=False)
         if delete_this == 0:
             return JsonResponse({"error": "Requested Comment doesn't exists."},
@@ -1340,10 +1303,9 @@ def DeleteComment(request, comment_id):
 @permission_classes([IsAuthenticated])
 def AddReply(request, comment_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         received_data = request.data
@@ -1356,7 +1318,7 @@ def AddReply(request, comment_id):
         if not comment.comment_active:
             raise Exception("The Comment is deleted.")
 
-        Reply(author_id=UserAccount.objects.get(user_id=decoded_token['user_id']),
+        Reply(author_id=UserAccount.objects.get(user_id=requesting_user.user_id),
               comment_id=comment, content=received_data['content']).save()
 
         return JsonResponse({"success": "Replied successfully!"}, status=status.HTTP_200_OK)
@@ -1373,10 +1335,9 @@ def AddReply(request, comment_id):
 @permission_classes([IsAuthenticated])
 def DeleteReply(request, reply_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        delete_this = Reply.objects.filter(author_id=decoded_token['user_id'], reply_id=reply_id). \
+        delete_this = Reply.objects.filter(author_id=requesting_user.user_id, reply_id=reply_id). \
             update(reply_active=False)
         if delete_this == 0:
             return JsonResponse({"error": "Requested Reply doesn't exists."},
@@ -1394,22 +1355,21 @@ def DeleteReply(request, reply_id):
 @permission_classes([IsAuthenticated])
 def Vote(request, option_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         received_data = request.data
 
-        already_registered = PollVotes.objects.filter(voter_id=decoded_token['user_id'],
+        already_registered = PollVotes.objects.filter(voter_id=requesting_user.user_id,
                                                       post_id=received_data['post_id'])
         if already_registered.count() > 0:
             return JsonResponse({"error": "Invalid voting request, The vote has already been registered"},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
 
         PollVotes(poll_option_id=Polls.objects.get(poll_option_id=option_id),
-                  voter_id=UserAccount.objects.get(user_id=decoded_token['user_id']),
+                  voter_id=UserAccount.objects.get(user_id=requesting_user.user_id),
                   post_id=Posts.objects.get(post_id=received_data['post_id'])).save()
 
         option_ids = list(Polls.objects.filter(post_id=received_data['post_id']).values("poll_option_id"))
@@ -1457,10 +1417,9 @@ def GetVoteResult(request, post_id):
 @permission_classes([IsAuthenticated])
 def ReportAccount(request, profile_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         received_data = request.data
@@ -1471,7 +1430,7 @@ def ReportAccount(request, profile_id):
         if UserAccount.objects.filter(user_id=profile_id).count() == 0:
             return JsonResponse({"error": "Invalid User Account."}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
-        reportAccount(report_id=str(uuid.uuid4()), raised_by=UserAccount.objects.get(user_id=decoded_token['user_id']),
+        reportAccount(report_id=str(uuid.uuid4()), raised_by=UserAccount.objects.get(user_id=requesting_user.user_id),
                       report_description=received_data['report_description'], report_on=profile_id).save()
         return JsonResponse({"success": "Report submitted successfully."}, status=status.HTTP_200_OK)
     except KeyError:
@@ -1486,10 +1445,9 @@ def ReportAccount(request, profile_id):
 @permission_classes([IsAuthenticated])
 def ReportPost(request, post_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         received_data = request.data
@@ -1497,7 +1455,7 @@ def ReportPost(request, post_id):
         if len(str(received_data['report_description']).strip()) == 0:
             return JsonResponse({"error": "Description can't be empty"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
-        reportPost(report_id=str(uuid.uuid4()), raised_by=UserAccount.objects.get(user_id=decoded_token['user_id']),
+        reportPost(report_id=str(uuid.uuid4()), raised_by=UserAccount.objects.get(user_id=requesting_user.user_id),
                    report_description=received_data['report_description'],
                    report_on=Posts.objects.get(post_id=post_id)).save()
         return JsonResponse({"success": "Report submitted successfully."}, status=status.HTTP_200_OK)
@@ -1513,10 +1471,9 @@ def ReportPost(request, post_id):
 @permission_classes([IsAuthenticated])
 def ReportComment(request, comment_id):
     try:
-        received_token = request.COOKIES.get("JWT_TOKEN")
-        decoded_token = decode_jwt_token(received_token)
+        requesting_user = verifyAuthenticationHeader(request)
 
-        if not UserAccount.objects.get(user_id=decoded_token['user_id']).user_if_email_verified:
+        if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
 
         received_data = request.data
@@ -1524,7 +1481,7 @@ def ReportComment(request, comment_id):
         if len(str(received_data['report_description']).strip()) == 0:
             return JsonResponse({"error": "Description can't be empty"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
-        reportComment(raised_by=UserAccount.objects.get(user_id=decoded_token['user_id']),
+        reportComment(raised_by=UserAccount.objects.get(user_id=requesting_user.user_id),
                       report_description=received_data['report_description'],
                       report_on=Comment.objects.get(comment_id=comment_id)).save()
         return JsonResponse({"success": "Report submitted successfully."}, status=status.HTTP_200_OK)
