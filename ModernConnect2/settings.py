@@ -147,9 +147,21 @@ AUTH_USER_MODEL = 'modernConnect.UserAccount'
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = ['http://localhost:3000']
 
-CORS_ALLOW_HEADERS = ('content-disposition', 'accept-encoding',
-                      'content-type', 'accept', 'origin', 'authorization', 'cache-control')
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'withCredentials'
+]
 
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:3000',
