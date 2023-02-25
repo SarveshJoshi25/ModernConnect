@@ -16,7 +16,7 @@ from .models import UserAccount, WorkExperience, EducationalExperience, ProjectD
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import jwt
-from config import jwt_secret
+from config import jwt_secret, front_end_deployment_url
 from rest_framework.authtoken.models import Token
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
@@ -372,7 +372,7 @@ def UserSignup(request):
         token = Token.objects.create(user=account)
 
         jsonResponse = JsonResponse({"Response": "Account created successfully! "}, status=status.HTTP_200_OK)
-        jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
+        jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path=front_end_deployment_url, httponly=False)
         return jsonResponse
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -475,6 +475,17 @@ def verifyEmailAddress(request):
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
+#
+# @api_view(["GET"])
+# @permission_classes([AllowAny])
+# def getCookieForServer(request):
+#     try:
+#         jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
+#         jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value="token", path="http://localhost:8000", httponly=False)
+#         return jsonResponse
+#     except Exception as e:
+#         return JsonResponse({"error": e.args})
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -514,7 +525,7 @@ def UserLogin(request):
                     }
                 })
             jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
-            jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token)
+            jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path=front_end_deployment_url, httponly=False)
             return jsonResponse
         else:
             return JsonResponse({"response": "Username and Password didn't match."},
