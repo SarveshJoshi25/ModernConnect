@@ -371,8 +371,9 @@ def UserSignup(request):
 
         token = Token.objects.create(user=account)
 
-        jsonResponse = JsonResponse({"Response": "Account created successfully! "}, status=status.HTTP_200_OK)
-        jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path=front_end_deployment_url, httponly=False)
+        jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
+        jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path="api/v1/user/signup/",
+                                httponly=False)  # max_age=120
         return jsonResponse
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -525,7 +526,8 @@ def UserLogin(request):
                     }
                 })
             jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
-            jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path=front_end_deployment_url, httponly=False)
+            jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path="api/v1/user/login/",
+                                    httponly=False) #max_age=120
             return jsonResponse
         else:
             return JsonResponse({"response": "Username and Password didn't match."},
