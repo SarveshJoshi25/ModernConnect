@@ -373,7 +373,7 @@ def UserSignup(request):
 
         jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
         jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path="api/v1/user/signup/",
-                                httponly=False)  # max_age=120
+                                httponly=False, samesite=None, max_age=120)
         return jsonResponse
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -527,7 +527,7 @@ def UserLogin(request):
                 })
             jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
             jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path="api/v1/user/login/",
-                                    httponly=False) #max_age=120
+                                    httponly=False, samesite=None, max_age=120) #max_age=120
             return jsonResponse
         else:
             return JsonResponse({"response": "Username and Password didn't match."},
