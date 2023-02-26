@@ -371,9 +371,8 @@ def UserSignup(request):
 
         token = Token.objects.create(user=account)
 
-        jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
-        jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path="api/v1/user/signup/",
-                                httponly=False, samesite=None, max_age=120)
+        jsonResponse = JsonResponse({"Response": "Logged In Successfully! ", "AUTHENTICATION_TOKEN": str(token)},
+                                    status=status.HTTP_200_OK)
         return jsonResponse
     except KeyError:
         return JsonResponse({"error": "Required Data was not found!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -476,6 +475,7 @@ def verifyEmailAddress(request):
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
+
 #
 # @api_view(["GET"])
 # @permission_classes([AllowAny])
@@ -525,9 +525,8 @@ def UserLogin(request):
                         'last_login': datetime.datetime.now()
                     }
                 })
-            jsonResponse = JsonResponse({"Response": "Logged In Successfully! "}, status=status.HTTP_200_OK)
-            jsonResponse.set_cookie(key="AUTHENTICATION_TOKEN", value=token, path="api/v1/user/login/",
-                                    httponly=False, samesite=None, max_age=120) #max_age=120
+            jsonResponse = JsonResponse({"Response": "Logged In Successfully! ", "AUTHENTICATION_TOKEN": str(token)},
+                                        status=status.HTTP_200_OK)
             return jsonResponse
         else:
             return JsonResponse({"response": "Username and Password didn't match."},
