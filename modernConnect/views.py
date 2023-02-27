@@ -452,7 +452,12 @@ def verifyEmailAddress(request):
         requesting_user = verifyAuthenticationHeader(request)
 
         received_data = request.data
+
+        print("Received Data : {0}".format(received_data))
+
         user_entered_otp = str(received_data.get('otp')).strip()
+
+
 
         collection_name = db['email_validation']
 
@@ -530,7 +535,8 @@ def UserLogin(request):
                         'last_login': datetime.datetime.now()
                     }
                 })
-            jsonResponse = JsonResponse({"Response": "Logged In Successfully! ", "AUTHENTICATION_TOKEN": str(token)},
+            jsonResponse = JsonResponse({"Response": "Logged In Successfully! ", "AUTHENTICATION_TOKEN": str(token),
+                                         "is_verified": user.user_if_email_verified, "is_blocked": user.is_blocked},
                                         status=status.HTTP_200_OK)
             return jsonResponse
         else:
