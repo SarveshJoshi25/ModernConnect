@@ -946,8 +946,9 @@ def UserAddProjectExperience(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def GetProjectDetails(request):
+def GetProjectDetails(request, page):
     """
+    :param page:
     :requirements: User must be logged in.
     :param request:
     :return: A Status 200 on Success, and 406 on errors.
@@ -957,7 +958,21 @@ def GetProjectDetails(request):
         requesting_user = verifyAuthenticationHeader(request)
 
         project_details = ProjectDetails.objects.filter(user_id=requesting_user.user_id).values()
-        return JsonResponse({"project_details": list(project_details)}, status=status.HTTP_200_OK)
+
+        paginator = Paginator(project_details, per_page=5)
+        page_object = paginator.get_page(page)
+
+        paginated_project_details = [detail for detail in page_object.object_list]
+        payload = {
+            "page": {
+                "current": page_object.number,
+                "has_next": page_object.has_next(),
+                "has_previous": page_object.has_previous(),
+            },
+            "project_details": paginated_project_details
+        }
+
+        return JsonResponse(payload, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
