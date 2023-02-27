@@ -20,6 +20,7 @@ from config import jwt_secret, front_end_deployment_url
 from rest_framework.authtoken.models import Token
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from django.core.paginator import Paginator
 
 
 def verifyAuthenticationHeader(request) -> UserAccount:
@@ -280,6 +281,10 @@ def verify_projects(list_of_projects, user_id):
         project.project_id = str(uuid.uuid4())
         list_of_verified_projects.append(project)
     return list_of_verified_projects
+
+
+def generateScrollFeed():
+    pass
 
 
 @api_view(["GET"])
@@ -606,18 +611,32 @@ def UserAddEducationalDetails(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def getEducationalDetails(request):
+def getEducationalDetails(request, page):
     """
     requirement: User must be logged in.
     :return: Status 200 on success, OR Status 406 for errors.
     """
     try:
         requesting_user = verifyAuthenticationHeader(request)
-
         educational_details = EducationalExperience.objects.filter(user_id=requesting_user.user_id).order_by(
             "enrollment_year").values()
-        educational_details = list(educational_details)
-        return JsonResponse({"educational_details": educational_details}, status=status.HTTP_200_OK)
+        paginator = Paginator(educational_details, per_page=5)
+        page_object = paginator.get_page(page)
+
+        paginated_educational_details = [detail for detail in page_object.object_list]
+        payload = {
+            "page": {
+                "current": page_object.number,
+                "has_next": page_object.has_next(),
+                "has_previous": page_object.has_previous(),
+            },
+            "educational_details": paginated_educational_details
+        }
+
+        return JsonResponse(payload, status=status.HTTP_200_OK)
+
+
+
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except KeyError:
@@ -711,13 +730,10 @@ def UserAddWorkExperience(request):
                 {
                     "work_designation": "Backend Developer Intern",
                     "work_organization": "Rhythmflows Solutions Pvt. Ltd.",
-                    "first_day_at_work": "01-08-2022",
-                    "last_day_at_work": "01-11-2022",
-                    "is_current_employer": "No",
-                    "work_description": "Developed features for the company's Financial Reconciliation Software. The
-                    day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgresSQL
-                    databases and sending responses to the front-end using JSON and collaborating with Front-end developers
-                    to develop full-stack features."
+                    "first_day_at_work": "2022-08-01",
+                    "last_day_at_work": "2022-11-01",
+                    "is_current_employer": "False",
+                    "work_description": "Developed features for the company's Financial Reconciliation Software. The day-to-day tasks include developing APIs using Python/Django to fetch and process data from PostgresSQL databases and sending responses to the front-end using JSON and collaborating with Front-end developers to develop full-stack features."
                 }
             ]
         }
@@ -729,7 +745,7 @@ def UserAddWorkExperience(request):
         requesting_user = verifyAuthenticationHeader(request)
 
         received_data = request.data
-        list_of_work = list(received_data.get("work_data"))
+        list_of_work = list(received_data.get("work_details"))
 
         if not requesting_user.user_if_email_verified:
             raise Exception("User is not verified, Please verify your email address first.")
@@ -753,8 +769,9 @@ def UserAddWorkExperience(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def GetWorkDetails(request):
+def GetWorkDetails(request, page):
     """
+    :param page:
     :requirements: User must be logged in.
     :param request:
     :return: A Status 200 on Success, and 406 on errors.
@@ -765,13 +782,27 @@ def GetWorkDetails(request):
 
         work_details = WorkExperience.objects.filter(user_id=requesting_user.user_id).order_by(
             'first_day_at_work').values()
-        for each in work_details:
+
+        paginator = Paginator(work_details, per_page=5)
+        page_object = paginator.get_page(page)
+
+        paginated_work_details = [detail for detail in page_object.object_list]
+
+        for each in paginated_work_details:
             if each['is_current_employer']:
                 work_experience = (datetime.datetime.today().year - each['first_day_at_work'].year) * 12 + \
                                   datetime.datetime.today().month - each['first_day_at_work'].month
                 each['work_experience'] = "{0} Years, {1} Months".format(int(work_experience / 12),
                                                                          work_experience % 12)
-        return JsonResponse({"work_details": list(work_details)}, status=status.HTTP_200_OK)
+        payload = {
+            "page": {
+                "current": page_object.number,
+                "has_next": page_object.has_next(),
+                "has_previous": page_object.has_previous(),
+            },
+            "work_details": paginated_work_details
+        }
+        return JsonResponse(payload, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
