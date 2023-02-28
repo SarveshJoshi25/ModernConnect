@@ -6,7 +6,7 @@ urlpatterns = [
     path("awake/", views.IsAwake, name="Is Awake"),
 
     path("get/scroll/page=<int:page>/", views.getScrollFeed, name="getScrollFeed"),
-
+    path("get/comments/<str:post_id>/page=<int:page>/", views.getComments, name="getComments"),
 
     path("user/signup/", views.UserSignup, name="User Signup"),
 
@@ -49,7 +49,6 @@ urlpatterns = [
     path("user/add/skill/", views.UserAddSkill, name="Add skill"),
     path("user/delete/skill/<str:skill_id>/", views.deleteSkill,
          name="Delete Skill"),
-
 
     path("profile/<str:user_name>", views.GetProfileInformation, name="GetProfileInformation"),
 

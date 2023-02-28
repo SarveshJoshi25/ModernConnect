@@ -1559,7 +1559,7 @@ def ReportComment(request, comment_id):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def getScrollFeed(request, page):
-    post_details = Posts.objects.filter(post_active=1).order_by("posted_on").values()
+    post_details = Posts.objects.filter(post_active=1).order_by("-posted_on").values()
 
     paginator = Paginator(post_details, per_page=10)
     page_object = paginator.get_page(page)
@@ -1570,7 +1570,7 @@ def getScrollFeed(request, page):
         each_post["post_author_id"] = UserAccount.objects.get(user_id=each_post.get("post_author_id")).user_name
         each_post["post_context_id"] = ContextPost.objects.get(context_id=each_post.get("post_context_id")).context_name
         each_post["post_upvotes"] = UpvotePosts.objects.filter(post_id=each_post.get("post_id")).count()
-        each_post["post_comments"] = UpvotePosts.objects.filter(post_id=each_post.get("post_id")).count()
+        each_post["post_comments"] = Comment.objects.filter(post_id=each_post.get("post_id")).count()
 
         if each_post["poll"] == 1:
             each_post["poll_options"] = []
@@ -1591,6 +1591,42 @@ def getScrollFeed(request, page):
             "has_previous": page_object.has_previous(),
         },
         "posts": paginated_posts
+    }
+
+    return JsonResponse(payload, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def getComments(request, post_id, page):
+    #  comment_id = models.CharField(verbose_name="comment_id", primary_key=True, default=str(uuid.uuid4()),
+    #                                   editable=False, max_length=60)
+    #     author_id = models.ForeignKey("UserAccount", verbose_name="author_id", on_delete=models.CASCADE)
+    #     post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
+    #     timestamp = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
+    #     content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
+    #     comment_active = models.IntegerField(default=1)
+
+    comments = Comment.objects.filter(comment_active=1).order_by("-timestamp").values('comment_id', 'author_id',
+                                                                                      'timestamp', 'content',
+                                                                                      'comment_active')
+
+    paginator = Paginator(comments, per_page=10)
+    page_object = paginator.get_page(page)
+
+    paginated_comments = [comment for comment in page_object.object_list]
+
+    for each_comment in paginated_comments:
+        each_comment["author_id"] = UserAccount.objects.get(user_id=each_comment.get("author_id")).user_name
+        each_comment["replies"] = Reply.objects.filter(comment_id=each_comment.get("comment_id")).count()
+
+    payload = {
+        "page": {
+            "current": page_object.number,
+            "has_next": page_object.has_next(),
+            "has_previous": page_object.has_previous(),
+        },
+        "posts": paginated_comments
     }
 
     return JsonResponse(payload, status=status.HTTP_200_OK)
