@@ -165,15 +165,16 @@ def validate_post(received_data, post_author):
                 raise Exception("Invalid Skill.")
         post.skills = str(received_data["skills"])
 
-    post.save()
-
     if received_data["poll"] and context.context_name == "#ask":
+        post.poll = 1
         poll_options = received_data["poll_options"]
         if not (2 <= len(poll_options) <= 4):
             raise Exception("Invalid Poll Options. (2 to 4 required)")
         for each_option in poll_options:
-            Polls(post_id=Posts.objects.get(post_id=post_id), poll_option_id=str(uuid.uuid4()),
+            Polls(post_id=post_id, poll_option_id=str(uuid.uuid4()),
                   poll_option_text=each_option).save()
+
+    post.save()
 
 
 def verify_education(list_of_education, user_id):
@@ -456,8 +457,6 @@ def verifyEmailAddress(request):
         print("Received Data : {0}".format(received_data))
 
         user_entered_otp = str(received_data.get('otp')).strip()
-
-
 
         collection_name = db['email_validation']
 
@@ -1568,8 +1567,22 @@ def getScrollFeed(request, page):
     paginated_posts = [post for post in page_object.object_list]
 
     for each_post in paginated_posts:
-        if not each_post.get("post_active"):
-            paginated_posts.remove(each_post)
+        each_post["post_author_id"] = UserAccount.objects.get(user_id=each_post.get("post_author_id")).user_name
+        each_post["post_context_id"] = ContextPost.objects.get(context_id=each_post.get("post_context_id")).context_name
+        each_post["post_upvotes"] = UpvotePosts.objects.filter(post_id=each_post.get("post_id")).count()
+        each_post["post_comments"] = UpvotePosts.objects.filter(post_id=each_post.get("post_id")).count()
+
+        if each_post["poll"] == 1:
+            each_post["poll_options"] = []
+            for each in Polls.objects.filter(post_id=each_post["post_id"]).values("poll_option_id", "poll_option_text"):
+                each_post["poll_options"].append(each)
+
+        if each_post["post_context_id"] == "#collaborate":
+            skill_set = each_post["skills"]
+            each_post["skills"] = []
+            for each in str(skill_set).split(','):
+                skill = Skills.objects.get(skill_id=int(each))
+                each_post["skills"].append({"skill_id": skill.skill_id, "skill_name": skill.skill_name})
 
     payload = {
         "page": {
@@ -1581,7 +1594,6 @@ def getScrollFeed(request, page):
     }
 
     return JsonResponse(payload, status=status.HTTP_200_OK)
-
 
 
 @api_view(["GET"])

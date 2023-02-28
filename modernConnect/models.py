@@ -125,7 +125,7 @@ class ProfileSkills(models.Model):
 
 
 class Polls(models.Model):
-    post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
+    post_id = models.CharField(editable=False, max_length=60)
     poll_option_id = models.CharField(primary_key=True, verbose_name="poll_option_id", editable=False, max_length=60)
     poll_option_text = models.CharField(verbose_name="poll_option_text", max_length=60)
 
@@ -150,6 +150,7 @@ class Posts(models.Model):
     post_context = models.ForeignKey("ContextPost", verbose_name="post_context", on_delete=models.CASCADE)
     skills = models.CharField(validators=[validate_comma_separated_integer_list], max_length=120)
     post_active = models.IntegerField(default=1)
+    poll = models.IntegerField(default=0)
 
 
 class Comment(models.Model):
