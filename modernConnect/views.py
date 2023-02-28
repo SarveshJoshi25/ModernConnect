@@ -1298,7 +1298,7 @@ def DeletePost(request, post_id):
         requesting_user = verifyAuthenticationHeader(request)
 
         delete_this = Posts.objects.filter(post_author=requesting_user.user_id,
-                                           post_id=post_id).update(post_active=False)
+                                           post_id=post_id).update(post_active=0)
         if delete_this == 0:
             return JsonResponse({"error": "Requested Post doesn't exists."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -1350,7 +1350,7 @@ def DeleteComment(request, comment_id):
         requesting_user = verifyAuthenticationHeader(request)
 
         delete_this = Comment.objects.filter(author_id=requesting_user.user_id, comment_id=comment_id). \
-            update(comment_active=False)
+            update(comment_active=0)
         if delete_this == 0:
             return JsonResponse({"error": "Requested Comment doesn't exists."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -1402,7 +1402,7 @@ def DeleteReply(request, reply_id):
         requesting_user = verifyAuthenticationHeader(request)
 
         delete_this = Reply.objects.filter(author_id=requesting_user.user_id, reply_id=reply_id). \
-            update(reply_active=False)
+            update(reply_active=0)
         if delete_this == 0:
             return JsonResponse({"error": "Requested Reply doesn't exists."},
                                 status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -1555,6 +1555,33 @@ def ReportComment(request, comment_id):
         return JsonResponse({"error": "User is not logged in."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def getScrollFeed(request, page):
+    post_details = Posts.objects.filter(post_active=1).order_by("posted_on").values()
+
+    paginator = Paginator(post_details, per_page=10)
+    page_object = paginator.get_page(page)
+
+    paginated_posts = [post for post in page_object.object_list]
+
+    for each_post in paginated_posts:
+        if not each_post.get("post_active"):
+            paginated_posts.remove(each_post)
+
+    payload = {
+        "page": {
+            "current": page_object.number,
+            "has_next": page_object.has_next(),
+            "has_previous": page_object.has_previous(),
+        },
+        "posts": paginated_posts
+    }
+
+    return JsonResponse(payload, status=status.HTTP_200_OK)
+
 
 
 @api_view(["GET"])

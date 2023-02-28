@@ -5,6 +5,9 @@ from . import views
 urlpatterns = [
     path("awake/", views.IsAwake, name="Is Awake"),
 
+    path("get/scroll/page=<int:page>/", views.getScrollFeed, name="getScrollFeed"),
+
+
     path("user/signup/", views.UserSignup, name="User Signup"),
 
     path("user/edit/details/", views.editUserDetails),

@@ -149,7 +149,7 @@ class Posts(models.Model):
     post_content = models.CharField(verbose_name="post_content", max_length=480, null=False)
     post_context = models.ForeignKey("ContextPost", verbose_name="post_context", on_delete=models.CASCADE)
     skills = models.CharField(validators=[validate_comma_separated_integer_list], max_length=120)
-    post_active = models.BooleanField(default=True)
+    post_active = models.IntegerField(default=1)
 
 
 class Comment(models.Model):
@@ -159,7 +159,7 @@ class Comment(models.Model):
     post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
     timestamp = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
     content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
-    comment_active = models.BooleanField(default=True)
+    comment_active = models.IntegerField(default=1)
 
 
 class Reply(models.Model):
@@ -169,7 +169,7 @@ class Reply(models.Model):
     comment_id = models.ForeignKey("Comment", verbose_name="parent_comment_id", on_delete=models.CASCADE)
     timestamp = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
     content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
-    reply_active = models.BooleanField(default=True)
+    reply_active = models.IntegerField(default=1)
 
 
 class reportPost(models.Model):
