@@ -7,6 +7,7 @@ urlpatterns = [
 
     path("get/scroll/page=<int:page>/", views.getScrollFeed, name="getScrollFeed"),
     path("get/comments/<str:post_id>/page=<int:page>/", views.getComments, name="getComments"),
+    path("get/reply/<str:comment_id>/page=<int:page>/", views.getReplies, name="getReplies"),
 
     path("user/signup/", views.UserSignup, name="User Signup"),
 
