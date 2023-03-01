@@ -1607,7 +1607,7 @@ def getComments(request, post_id, page):
     #     content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
     #     comment_active = models.IntegerField(default=1)
 
-    comments = Comment.objects.filter(comment_active=1).order_by("-timestamp").values('comment_id', 'author_id',
+    comments = Comment.objects.filter(comment_active=1, post_id=post_id).order_by("-timestamp").values('comment_id', 'author_id',
                                                                                       'timestamp', 'content',
                                                                                       'comment_active')
 
@@ -1627,6 +1627,42 @@ def getComments(request, post_id, page):
             "has_previous": page_object.has_previous(),
         },
         "posts": paginated_comments
+    }
+
+    return JsonResponse(payload, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def getReplies(request, comment_id, page):
+
+    # reply_id = models.CharField(verbose_name="reply_id", primary_key=True, default=str(uuid.uuid4()),
+    #                             editable=False, max_length=60)
+    # author_id = models.ForeignKey("UserAccount", verbose_name="author_id", on_delete=models.CASCADE)
+    # comment_id = models.ForeignKey("Comment", verbose_name="parent_comment_id", on_delete=models.CASCADE)
+    # timestamp = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
+    # content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
+    # reply_active = models.IntegerField(default=1)
+
+    replies = Reply.objects.filter(reply_active=1, comment_id=comment_id).order_by("-timestamp").\
+        values("reply_id", "author_id", "timestamp", "content")
+
+    paginator = Paginator(replies, per_page=10)
+    page_object = paginator.get_page(page)
+
+    paginated_replies = [reply for reply in page_object.object_list]
+
+    for each_reply in paginated_replies:
+        each_reply["author_id"] = UserAccount.objects.get(user_id=each_reply.get("author_id")).user_name
+
+
+    payload = {
+        "page": {
+            "current": page_object.number,
+            "has_next": page_object.has_next(),
+            "has_previous": page_object.has_previous(),
+        },
+        "posts": paginated_replies
     }
 
     return JsonResponse(payload, status=status.HTTP_200_OK)
