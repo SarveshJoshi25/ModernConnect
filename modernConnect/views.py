@@ -247,7 +247,7 @@ def verify_work(list_of_work, user_id):
                 raise Exception("error: Invalid First Day at Work and First Day at Work Pair.")
             work.last_day_at_work = each_work_experience["last_day_at_work"]
             work_experience = (work.last_day_at_work.year - work.first_day_at_work.year) * 12 + \
-                              work.last_day_at_work.month - work.first_day_at_work.month
+                              (work.last_day_at_work.month - work.first_day_at_work.month)
             work.work_experience = "{0} Years, {1} Months".format(int(work_experience / 12), work_experience % 12)
         work.user_id = user_id
         work.work_description = each_work_experience["work_description"]
@@ -614,31 +614,28 @@ def UserAddEducationalDetails(request):
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
+def get_educational_details_with_username(username: str) -> list:
+    requesting_user = UserAccount.objects.get(user_name=username)
+
+    educational_details = EducationalExperience.objects.filter(user_id=requesting_user.user_id).order_by(
+        "enrollment_year").values()
+
+    return [education for education in educational_details]
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def getEducationalDetails(request, page):
+def getEducationalDetails(request):
     """
     requirement: User must be logged in.
     :return: Status 200 on success, OR Status 406 for errors.
     """
     try:
         requesting_user = verifyAuthenticationHeader(request)
-        educational_details = EducationalExperience.objects.filter(user_id=requesting_user.user_id).order_by(
-            "enrollment_year").values()
-        paginator = Paginator(educational_details, per_page=5)
-        page_object = paginator.get_page(page)
 
-        paginated_educational_details = [detail for detail in page_object.object_list]
-        payload = {
-            "page": {
-                "current": page_object.number,
-                "has_next": page_object.has_next(),
-                "has_previous": page_object.has_previous(),
-            },
-            "educational_details": paginated_educational_details
-        }
+        educational_details = get_educational_details_with_username(requesting_user.user_name)
 
-        return JsonResponse(payload, status=status.HTTP_200_OK)
+        return JsonResponse({"educational_details": educational_details}, status=status.HTTP_200_OK)
 
 
 
@@ -730,7 +727,7 @@ def UserAddWorkExperience(request):
 
     Sample Input:
         {
-            "work_data":
+            "work_details":
             [
                 {
                     "work_designation": "Backend Developer Intern",
@@ -772,9 +769,18 @@ def UserAddWorkExperience(request):
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
+def get_work_details_with_username(username: str) -> list:
+    requesting_user = UserAccount.objects.get(user_name=username)
+
+    work_details = WorkExperience.objects.filter(user_id=requesting_user.user_id).order_by(
+        "first_day_at_work").values()
+
+    return [work for work in work_details]
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def GetWorkDetails(request, page):
+def GetWorkDetails(request):
     """
     :param page:
     :requirements: User must be logged in.
@@ -785,29 +791,9 @@ def GetWorkDetails(request, page):
     try:
         requesting_user = verifyAuthenticationHeader(request)
 
-        work_details = WorkExperience.objects.filter(user_id=requesting_user.user_id).order_by(
-            'first_day_at_work').values()
+        work_details = get_work_details_with_username(requesting_user.user_name)
 
-        paginator = Paginator(work_details, per_page=5)
-        page_object = paginator.get_page(page)
-
-        paginated_work_details = [detail for detail in page_object.object_list]
-
-        for each in paginated_work_details:
-            if each['is_current_employer']:
-                work_experience = (datetime.datetime.today().year - each['first_day_at_work'].year) * 12 + \
-                                  datetime.datetime.today().month - each['first_day_at_work'].month
-                each['work_experience'] = "{0} Years, {1} Months".format(int(work_experience / 12),
-                                                                         work_experience % 12)
-        payload = {
-            "page": {
-                "current": page_object.number,
-                "has_next": page_object.has_next(),
-                "has_previous": page_object.has_previous(),
-            },
-            "work_details": paginated_work_details
-        }
-        return JsonResponse(payload, status=status.HTTP_200_OK)
+        return JsonResponse({"work_details": work_details}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
@@ -943,9 +929,17 @@ def UserAddProjectExperience(request):
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
+def get_project_details_with_username(username: str) -> list:
+    requesting_user = UserAccount.objects.get(user_name=username)
+
+    project_details = ProjectDetails.objects.filter(user_id=requesting_user.user_id).values()
+
+    return [project for project in project_details]
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def GetProjectDetails(request, page):
+def GetProjectDetails(request):
     """
     :param page:
     :requirements: User must be logged in.
@@ -956,22 +950,9 @@ def GetProjectDetails(request, page):
     try:
         requesting_user = verifyAuthenticationHeader(request)
 
-        project_details = ProjectDetails.objects.filter(user_id=requesting_user.user_id).values()
+        project_details = get_project_details_with_username(requesting_user.user_name)
 
-        paginator = Paginator(project_details, per_page=5)
-        page_object = paginator.get_page(page)
-
-        paginated_project_details = [detail for detail in page_object.object_list]
-        payload = {
-            "page": {
-                "current": page_object.number,
-                "has_next": page_object.has_next(),
-                "has_previous": page_object.has_previous(),
-            },
-            "project_details": paginated_project_details
-        }
-
-        return JsonResponse(payload, status=status.HTTP_200_OK)
+        return JsonResponse({"project_details": project_details}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
@@ -1093,17 +1074,23 @@ def UserAddSocialLink(request):
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
+def get_social_link_with_username(username: str) -> list:
+    requesting_user = UserAccount.objects.get(user_name=username)
+
+    social_links = SocialLinks.objects.filter(social_link_author_id=requesting_user.user_id).values()
+
+    return [link for link in social_links]
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def GetSocialLink(request):
     try:
         requesting_user = verifyAuthenticationHeader(request)
 
-        if not requesting_user.user_if_email_verified:
-            raise Exception("User is not verified, Please verify your email address first.")
+        social_links = get_social_link_with_username(requesting_user.user_name)
 
-        link_details = SocialLinks.objects.filter(social_link_author=requesting_user.user_id).values()
-        return JsonResponse({"social_links": list(link_details)}, status=status.HTTP_200_OK)
+        return JsonResponse({"social_links": social_links}, status=status.HTTP_200_OK)
     except jwt.exceptions.DecodeError:
         return JsonResponse({"error": "User is not Logged-In."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
@@ -1599,17 +1586,11 @@ def getScrollFeed(request, page):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def getComments(request, post_id, page):
-    #  comment_id = models.CharField(verbose_name="comment_id", primary_key=True, default=str(uuid.uuid4()),
-    #                                   editable=False, max_length=60)
-    #     author_id = models.ForeignKey("UserAccount", verbose_name="author_id", on_delete=models.CASCADE)
-    #     post_id = models.ForeignKey("Posts", verbose_name="post_id", on_delete=models.CASCADE)
-    #     timestamp = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
-    #     content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
-    #     comment_active = models.IntegerField(default=1)
-
-    comments = Comment.objects.filter(comment_active=1, post_id=post_id).order_by("-timestamp").values('comment_id', 'author_id',
-                                                                                      'timestamp', 'content',
-                                                                                      'comment_active')
+    comments = Comment.objects.filter(comment_active=1, post_id=post_id).order_by("-timestamp").values('comment_id',
+                                                                                                       'author_id',
+                                                                                                       'timestamp',
+                                                                                                       'content',
+                                                                                                       'comment_active')
 
     paginator = Paginator(comments, per_page=10)
     page_object = paginator.get_page(page)
@@ -1635,16 +1616,7 @@ def getComments(request, post_id, page):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def getReplies(request, comment_id, page):
-
-    # reply_id = models.CharField(verbose_name="reply_id", primary_key=True, default=str(uuid.uuid4()),
-    #                             editable=False, max_length=60)
-    # author_id = models.ForeignKey("UserAccount", verbose_name="author_id", on_delete=models.CASCADE)
-    # comment_id = models.ForeignKey("Comment", verbose_name="parent_comment_id", on_delete=models.CASCADE)
-    # timestamp = models.DateTimeField(verbose_name="posted_on", default=django.utils.timezone.now, editable=False)
-    # content = models.CharField(verbose_name="comment_content", max_length=480, null=False)
-    # reply_active = models.IntegerField(default=1)
-
-    replies = Reply.objects.filter(reply_active=1, comment_id=comment_id).order_by("-timestamp").\
+    replies = Reply.objects.filter(reply_active=1, comment_id=comment_id).order_by("-timestamp"). \
         values("reply_id", "author_id", "timestamp", "content")
 
     paginator = Paginator(replies, per_page=10)
@@ -1654,7 +1626,6 @@ def getReplies(request, comment_id, page):
 
     for each_reply in paginated_replies:
         each_reply["author_id"] = UserAccount.objects.get(user_id=each_reply.get("author_id")).user_name
-
 
     payload = {
         "page": {
@@ -1668,10 +1639,48 @@ def getReplies(request, comment_id, page):
     return JsonResponse(payload, status=status.HTTP_200_OK)
 
 
+def get_profile_information_with_username(user_name) -> list:
+    profile_information = UserAccount.objects.filter(user_name=user_name).values("user_name", "user_email", "user_full_name", "user_account_type", "user_contact", "user_bio", "is_active")
+
+    return [info for info in profile_information]
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def GetProfileInformation(request, user_name):
-    pass
+    try:
+        profile_user_information = get_profile_information_with_username(user_name)
+
+        profile_educational_details = get_educational_details_with_username(user_name)
+
+        profile_work_details = get_work_details_with_username(user_name)
+
+        profile_project_details = get_project_details_with_username(user_name)
+
+        profile_social_links_details = get_social_link_with_username(user_name)
+
+        return JsonResponse({"profile_information": [
+            {
+                "user_information": profile_user_information
+            },
+            {
+                "educational_details": profile_educational_details
+            },
+            {
+                "work_details": profile_work_details,
+            },
+            {
+                "project_details": profile_project_details,
+            },
+            {
+                "social_links": profile_social_links_details
+            }
+        ]})
+
+    except UserAccount.DoesNotExist:
+        return JsonResponse({"error": "User doesn't exists."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
 
 
 @api_view(["GET"])

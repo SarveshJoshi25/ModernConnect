@@ -1,6 +1,7 @@
 .env
 venv
 db.sqlite3
-.idea/
-
+env
+.idea
 modernConnect/migrations
+modernConnect/__pycache__/

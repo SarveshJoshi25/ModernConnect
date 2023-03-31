@@ -20,21 +20,21 @@ urlpatterns = [
     path("user/verify_email/", views.verifyEmailAddress, name="Email Verification"),
 
     path("user/add/educational_details/", views.UserAddEducationalDetails, name="Add educational details"),
-    path("user/get/educational_details/page=<int:page>/", views.getEducationalDetails, name="Get Educational Details"),
+    path("user/get/educational_details/", views.getEducationalDetails, name="Get Educational Details"),
     path("user/update/educational_details/<str:education_id>/", views.editEducationalDetailsSeparate,
          name="Edit Educational Details Separate"),
     path("user/delete/educational_details/<str:education_id>", views.deleteEducationalDetailsSeparate,
          name="Delete Educational Details Separate"),
 
     path("user/add/work_details/", views.UserAddWorkExperience, name="Add work experience"),
-    path("user/get/work_details/page=<int:page>/", views.GetWorkDetails, name="Get Work Details"),
+    path("user/get/work_details/", views.GetWorkDetails, name="Get Work Details"),
     path("user/update/work_details/<str:work_id>/", views.editWorkDetailsSeparate,
          name="Edit Work Details Separate"),
     path("user/delete/work_details/<str:work_id>/", views.deleteWorkDetails,
          name="Delete Work Details Separate"),
 
     path("user/add/project_details/", views.UserAddProjectExperience, name="Add work experience"),
-    path("user/get/project_details/page=<int:page>/", views.GetProjectDetails, name="Get Work Details"),
+    path("user/get/project_details/", views.GetProjectDetails, name="Get Work Details"),
     path("user/update/project_details/<str:project_id>/", views.editProjectDetailsSeparate,
          name="Edit Work Details Separate"),
     path("user/delete/project_details/<str:project_id>/", views.deleteProjectDetails,
@@ -51,7 +51,7 @@ urlpatterns = [
     path("user/delete/skill/<str:skill_id>/", views.deleteSkill,
          name="Delete Skill"),
 
-    path("profile/<str:user_name>", views.GetProfileInformation, name="GetProfileInformation"),
+    path("profile/<str:user_name>/", views.GetProfileInformation, name="GetProfileInformation"),
 
     path("user/create/post/", views.CreatePost, name="CreatePost"),
     path("user/delete/post/<str:post_id>/", views.DeletePost, name="DeletePost"),
