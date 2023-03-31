@@ -52,6 +52,8 @@ urlpatterns = [
          name="Delete Skill"),
 
     path("profile/<str:user_name>/", views.GetProfileInformation, name="GetProfileInformation"),
+    path("profile/posts/<str:user_name>/page=<int:page>/", views.get_posts_with_username, name="get_posts_with_username"),
+
 
     path("user/create/post/", views.CreatePost, name="CreatePost"),
     path("user/delete/post/<str:post_id>/", views.DeletePost, name="DeletePost"),

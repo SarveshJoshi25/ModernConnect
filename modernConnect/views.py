@@ -165,14 +165,15 @@ def validate_post(received_data, post_author):
                 raise Exception("Invalid Skill.")
         post.skills = str(received_data["skills"])
 
-    if received_data["poll"] and context.context_name == "#ask":
-        post.poll = 1
-        poll_options = received_data["poll_options"]
-        if not (2 <= len(poll_options) <= 4):
-            raise Exception("Invalid Poll Options. (2 to 4 required)")
-        for each_option in poll_options:
-            Polls(post_id=post_id, poll_option_id=str(uuid.uuid4()),
-                  poll_option_text=each_option).save()
+    if context.context_name == "#ask":
+        if received_data["poll"]:
+            post.poll = 1
+            poll_options = received_data["poll_options"]
+            if not (2 <= len(poll_options) <= 4):
+                raise Exception("Invalid Poll Options. (2 to 4 required)")
+            for each_option in poll_options:
+                Polls(post_id=post_id, poll_option_id=str(uuid.uuid4()),
+                      poll_option_text=each_option).save()
 
     post.save()
 
@@ -282,10 +283,6 @@ def verify_projects(list_of_projects, user_id):
         project.project_id = str(uuid.uuid4())
         list_of_verified_projects.append(project)
     return list_of_verified_projects
-
-
-def generateScrollFeed():
-    pass
 
 
 @api_view(["GET"])
@@ -1156,15 +1153,15 @@ def deleteSocialLink(request, social_link_id):
 def UserAddSkill(request):
     """
     {
-    "skills":[
-        {
-            "skill_id": 1,
+        "skills":
+        [
+            {
+            "skill_id": 1
+            },
+            {
+            "skill_id": 2
 
-        },
-        {
-            "skill_id": 5,
-
-        },
+            }
         ]
     }
     :param request:
@@ -1182,7 +1179,7 @@ def UserAddSkill(request):
         verified_skills = []
         for each_skill in list_of_skills:
             skill = ProfileSkills(skill_id=Skills.objects.get(skill_id=each_skill['skill_id']),
-                                  user_id=requesting_user.user_id,
+                                  user_id=requesting_user,
                                   profile_skill_id=str(uuid.uuid4()))
             verified_skills.append(skill)
         for skill in verified_skills:
@@ -1585,6 +1582,54 @@ def getScrollFeed(request, page):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def get_posts_with_username(request, user_name, page):
+    try:
+        requested_for = UserAccount.objects.get(user_name=user_name)
+        post_details = Posts.objects.filter(post_active=1, post_author=requested_for).order_by("-posted_on").values()
+
+        paginator = Paginator(post_details, per_page=10)
+        page_object = paginator.get_page(page)
+
+        paginated_posts = [post for post in page_object.object_list]
+
+        for each_post in paginated_posts:
+            each_post["post_author_id"] = UserAccount.objects.get(user_id=each_post.get("post_author_id")).user_name
+            each_post["post_context_id"] = ContextPost.objects.get(
+                context_id=each_post.get("post_context_id")).context_name
+            each_post["post_upvotes"] = UpvotePosts.objects.filter(post_id=each_post.get("post_id")).count()
+            each_post["post_comments"] = Comment.objects.filter(post_id=each_post.get("post_id")).count()
+
+            if each_post["poll"] == 1:
+                each_post["poll_options"] = []
+                for each in Polls.objects.filter(post_id=each_post["post_id"]).values("poll_option_id",
+                                                                                      "poll_option_text"):
+                    each_post["poll_options"].append(each)
+
+            if each_post["post_context_id"] == "#collaborate":
+                skill_set = each_post["skills"]
+                each_post["skills"] = []
+                for each in str(skill_set).split(','):
+                    skill = Skills.objects.get(skill_id=int(each))
+                    each_post["skills"].append({"skill_id": skill.skill_id, "skill_name": skill.skill_name})
+
+        payload = {
+            "page": {
+                "current": page_object.number,
+                "has_next": page_object.has_next(),
+                "has_previous": page_object.has_previous(),
+            },
+            "posts": paginated_posts
+        }
+
+        return JsonResponse(payload, status=status.HTTP_200_OK)
+    except UserAccount.DoesNotExist:
+        return JsonResponse({"error": "User not found."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    except Exception as e:
+        return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def getComments(request, post_id, page):
     comments = Comment.objects.filter(comment_active=1, post_id=post_id).order_by("-timestamp").values('comment_id',
                                                                                                        'author_id',
@@ -1640,9 +1685,20 @@ def getReplies(request, comment_id, page):
 
 
 def get_profile_information_with_username(user_name) -> list:
-    profile_information = UserAccount.objects.filter(user_name=user_name).values("user_name", "user_email", "user_full_name", "user_account_type", "user_contact", "user_bio", "is_active")
+    profile_information = UserAccount.objects.filter(user_name=user_name).values("user_name", "user_email",
+                                                                                 "user_full_name", "user_account_type",
+                                                                                 "user_contact", "user_bio",
+                                                                                 "is_active")
 
     return [info for info in profile_information]
+
+
+def get_skills_with_username(user_name) -> list:
+    requested_user = UserAccount.objects.get(user_name=user_name)
+    profile_skill_ids = ProfileSkills.objects.filter(user_id=requested_user).values("skill_id")
+
+    return [Skills.objects.get(skill_id=skill).skill_name for skill in profile_skill_ids]
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -1657,6 +1713,8 @@ def GetProfileInformation(request, user_name):
         profile_project_details = get_project_details_with_username(user_name)
 
         profile_social_links_details = get_social_link_with_username(user_name)
+
+        profile_skills = get_skills_with_username(user_name)
 
         return JsonResponse({"profile_information": [
             {
@@ -1673,6 +1731,9 @@ def GetProfileInformation(request, user_name):
             },
             {
                 "social_links": profile_social_links_details
+            },
+            {
+                "profile_skills": profile_skills
             }
         ]})
 
@@ -1680,7 +1741,6 @@ def GetProfileInformation(request, user_name):
         return JsonResponse({"error": "User doesn't exists."}, status=status.HTTP_406_NOT_ACCEPTABLE)
     except Exception as e:
         return JsonResponse({"error": e.args}, status=status.HTTP_406_NOT_ACCEPTABLE)
-
 
 
 @api_view(["GET"])
